@@ -1,6 +1,6 @@
 :root {
-  --bg: #100f1f; --bg2: #16152a; --bg3: #1e1d36; --rule: #26254a; --rule2: #34335c;
-  --ink: #eeedf6; --ink2: #9a99b8; --ink3: #5e5d7e;
+  --bg: #000000; --bg2: #0a0a0c; --bg3: #131316; --rule: #1e1e24; --rule2: #2c2c34;
+  --ink: #f2f2f2; --ink2: #9a9aa4; --ink3: #5e5e68;
   --mint: #00ffc4; --mint2: #00c99a; --mint3: #0d5c4b; --amber: #f2b544; --red: #ff6b61; --blue: #6cb5ff;
   --sans: "Inter", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
@@ -8,7 +8,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.mast { display: flex; align-items: center; gap: 20px; padding: 14px 28px; border-bottom: 1px solid var(--rule); background: linear-gradient(180deg, #17162c 0%, var(--bg) 100%); }
+.mast { display: flex; align-items: center; gap: 20px; padding: 14px 28px; border-bottom: 1px solid var(--rule); background: linear-gradient(180deg, #0c0c0f 0%, var(--bg) 100%); }
 .mark { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .12em; font-size: 13px; }
 .mark span { color: var(--ink2); font-weight: 400; letter-spacing: .04em; }
 .mast .meta { margin-left: auto; display: flex; gap: 18px; align-items: center; color: var(--ink2); font-size: 12px; }
