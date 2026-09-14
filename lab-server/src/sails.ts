@@ -89,3 +89,43 @@ function toBigInt(v: unknown): bigint {
   if (typeof v === 'string') return BigInt(v.replace(/,/g, ''));
   throw new Error(`cannot convert ${String(v)} to bigint`);
 }
+
+/** Codec for the wallet's ledger program: transfer, faucet, balance query. */
+export class LedgerCodec {
+  private constructor(private readonly program: SailsProgram) {}
+
+  static async load(idlPath: string): Promise<LedgerCodec> {
+    const parser = new SailsIdlParser();
+    await parser.init();
+    return new LedgerCodec(new SailsProgram(parser.parse(readFileSync(idlPath, 'utf8'))));
+  }
+
+  private get svc() {
+    return this.program.services.Ledger;
+  }
+
+  encodeTransfer(to: Hex, amount: bigint): Hex {
+    return this.svc.functions.Transfer.encodePayload(to, amount) as Hex;
+  }
+
+  encodeFaucet(): Hex {
+    return this.svc.functions.Faucet.encodePayload() as Hex;
+  }
+
+  encodeBalanceOf(who: Hex): Hex {
+    return this.svc.queries.BalanceOf.encodePayload(who) as Hex;
+  }
+
+  // sails-js checks the reply header against the export it decodes for, so each reply has its own decoder.
+  decodeBalance(payload: Hex): bigint {
+    return toBigInt(this.svc.queries.BalanceOf.decodeResult(payload));
+  }
+
+  decodeTransferReply(payload: Hex): bigint {
+    return toBigInt(this.svc.functions.Transfer.decodeResult(payload));
+  }
+
+  decodeFaucetReply(payload: Hex): bigint {
+    return toBigInt(this.svc.functions.Faucet.decodeResult(payload));
+  }
+}

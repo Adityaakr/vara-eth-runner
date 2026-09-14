@@ -29,3 +29,5 @@ for i in $(seq 1 "$INSTANCES"); do
   [[ $i -eq 1 ]] && echo "$MIRROR" > "$LAB/run/mirror.addr"
   echo "instance $i: mirror $MIRROR init reply code $CODE"
 done
+# Wallet ledger program (balances, transfer, faucet), one instance.
+[[ -f "$LAB/ledger/target/wasm32-gear/release/ledger.opt.wasm" ]] && "$LAB/run/deploy-ledger.sh"

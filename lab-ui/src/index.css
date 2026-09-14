@@ -84,3 +84,9 @@ details.panel[open] summary h2 { margin-bottom: 10px; }
 .drawer .sub { margin-top: 16px; border-top: 1px solid var(--rule); padding-top: 10px; }
 .drawer .row { padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 12px; } .drawer .big { color: var(--mint); font-weight: 600; font-family: var(--mono); }
 code { color: var(--ink2); font-family: var(--mono); }
+.drawer .tabs { display: flex; gap: 6px; align-items: center; margin: 4px 0 14px; border-bottom: 1px solid var(--rule); padding-bottom: 10px; }
+.drawer .tab { font: inherit; background: transparent; color: var(--ink2); border: 1px solid transparent; padding: 6px 14px; cursor: pointer; border-radius: 2px; letter-spacing: .06em; text-transform: uppercase; font-size: 11px; }
+.drawer .tab.on { color: var(--mint); border-color: var(--mint3); background: color-mix(in srgb, var(--mint) 8%, transparent); }
+.drawer .form.send { grid-template-columns: 2.4fr 1fr auto; }
+.drawer .faucet { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 12px; border: 1px solid var(--mint3); border-radius: 3px; color: var(--ink2); font-size: 12px; }
+.drawer .faucet span { flex: 1; }

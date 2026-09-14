@@ -41,6 +41,7 @@ export type Snapshot = {
   mirror: string;
   sender: string;
   node: { quarantine: number; blockTime: number; startedAt: string };
+  ledger: string | null;
   ethHead: string;
   preconf: BookView;
   preconfError: string | null;

@@ -9,7 +9,8 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import type { BlastResult } from './blast.js';
 import { connectChain } from './chain.js';
 import { bigintReplacer } from './committed.js';
-import { LAB_ROOT, nodeSettings } from './config.js';
+import { LAB_ROOT, LEDGER_IDL_PATH, ledgerAddress, nodeSettings } from './config.js';
+import { LedgerCodec } from './sails.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { LabEngine, type PreparedInjected } from './engine.js';
 import type { Hex } from 'viem';
@@ -39,7 +40,10 @@ type Command =
   | { type: 'autopilot'; rate: number }
   | { type: 'network'; profile: NetProfile['name'] }
   | { type: 'recycle' }
-  | { type: 'prepare'; side: number; price: string; qty: string }
+  | { type: 'prepare'; kind?: 'place'; side: number; price: string; qty: string }
+  | { type: 'prepare'; kind: 'transfer'; to: string; amount: string }
+  | { type: 'prepare'; kind: 'faucet' }
+  | { type: 'balance'; address: string }
   | { type: 'submitSigned'; prepId: string; signature: string; address: string };
 
 /** performance.now() → wall-clock ms, using the record's own submit pair as the reference. */
@@ -51,6 +55,8 @@ async function main() {
   // Network emulation: every engine (this process and its children) talks to the validator through
   // a proxy that delays frames by a calibrated one-way latency. Calibration is a live round trip to
   // Gear's public Vara RPC, i.e. the region where Vara.eth validators are hosted.
+  const ledgerAddr = ledgerAddress();
+  const ledger = ledgerAddr ? await LedgerCodec.load(LEDGER_IDL_PATH) : null;
   const cal = await calibrate(CALIBRATION_URL, 'system_chain');
   const table = profiles(cal);
   const netem = new NetEmulator(VARA_ETH_RPC_DIRECT, table[DEFAULT_NET_PROFILE] ?? table.measured);
@@ -154,7 +160,7 @@ async function main() {
   let blastState: { running: boolean; last: Omit<BlastResult, 'records'> | null } = { running: false, last: null };
   let blastChild: ChildProcess | null = null;
   const blockMeta = new Map<bigint, { hash: string; timestamp: number }>();
-  const prepared = new Map<string, { p: PreparedInjected; at: number }>();
+  const prepared = new Map<string, { p: PreparedInjected; at: number; decode?: (payload: Hex) => bigint }>();
   let prepSeq = 0;
 
   const throughputSeries = (records: WriteRecord[], now: number) => {
@@ -236,6 +242,7 @@ async function main() {
         mirror: chain.mirrorAddress,
         sender: chain.sender.address,
         node: nodeSettings(),
+        ledger: ledgerAddr,
         ethHead: await chain.publicClient.getBlockNumber().catch(() => 0n),
         preconf: lastPreconf,
         preconfError,
@@ -246,7 +253,7 @@ async function main() {
           preconfirmed: allTime.preconfirmed + engine.records.filter((r) => r.path === 'injected' && !r.error && r.tPreconf !== undefined).length,
           committed: records.filter((r) => r.tCommitted !== undefined).length,
           failed: allTime.failed + engine.records.filter((r) => r.error).length,
-          pending: records.filter((r) => !r.error && r.tCommitted === undefined).length,
+          pending: records.filter((r) => !r.error && !r.untracked && r.tCommitted === undefined).length,
           allTimeMinMs: Number.isFinite(allTime.minMs) ? allTime.minMs : null,
           allTimeMeanMs: allTime.preconfirmed ? allTime.sumMs / allTime.preconfirmed : null,
         },
@@ -319,10 +326,31 @@ async function main() {
     } else if (cmd.type === 'autopilot') {
       const rate = Math.min(300, Math.max(0, Number(cmd.rate) || 0));
       setAutopilot(rate);
+    } else if (cmd.type === 'balance') {
+      if (!ledger || !ledgerAddr) throw new Error('ledger not deployed');
+      const who = cmd.address.toLowerCase() as Hex;
+      const balance = ledger.decodeBalance(await engine.queryRaw(ledgerAddr, ledger.encodeBalanceOf(who)));
+      return { type: 'balance', address: who, balance: balance.toString() };
     } else if (cmd.type === 'prepare') {
-      const p = await engine.prepareInjected(Number(cmd.side), BigInt(cmd.price), BigInt(cmd.qty));
+      let p: PreparedInjected;
+      let decode: ((payload: Hex) => bigint) | undefined;
+      if (cmd.kind === 'transfer') {
+        if (!ledger || !ledgerAddr) throw new Error('ledger not deployed');
+        const to = cmd.to.toLowerCase() as Hex;
+        const amount = BigInt(cmd.amount);
+        if (!/^0x[0-9a-f]{40}$/.test(to)) throw new Error('recipient must be a 20-byte hex address');
+        if (amount <= 0n) throw new Error('amount must be positive');
+        p = await engine.prepareCall(ledgerAddr, ledger.encodeTransfer(to, amount), `transfer ${amount} → ${to.slice(0, 6)}…${to.slice(-4)}`);
+        decode = (x) => ledger.decodeTransferReply(x);
+      } else if (cmd.kind === 'faucet') {
+        if (!ledger || !ledgerAddr) throw new Error('ledger not deployed');
+        p = await engine.prepareCall(ledgerAddr, ledger.encodeFaucet(), 'faucet');
+        decode = (x) => ledger.decodeFaucetReply(x);
+      } else {
+        p = await engine.prepareInjected(Number(cmd.side), BigInt(cmd.price), BigInt(cmd.qty));
+      }
       const prepId = String(++prepSeq);
-      prepared.set(prepId, { p, at: Date.now() });
+      prepared.set(prepId, { p, at: Date.now(), decode });
       for (const [k, v] of prepared) if (Date.now() - v.at > 120_000) prepared.delete(k);
       return { type: 'prepared', prepId, hash: p.tx.hash, messageId: p.tx.messageId };
     } else if (cmd.type === 'submitSigned') {
@@ -338,8 +366,8 @@ async function main() {
           throw new Error('not supported');
         },
       });
-      const rec = await engine.sendPrepared(entry.p, 'passkey', address);
-      return { type: 'submitted', prepId: cmd.prepId, orderId: rec.orderId?.toString() ?? null, preconfMs: rec.tPreconf !== undefined ? rec.tPreconf - rec.tSubmit : null, error: rec.error ?? null };
+      const rec = await engine.sendPrepared(entry.p, 'passkey', address, entry.decode);
+      return { type: 'submitted', prepId: cmd.prepId, orderId: rec.orderId?.toString() ?? null, result: rec.orderId?.toString() ?? null, preconfMs: rec.tPreconf !== undefined ? rec.tPreconf - rec.tSubmit : null, error: rec.error ?? null };
     } else if (cmd.type === 'blast') {
       if (blastState.running) throw new Error('a load test is already running');
       if (validator.recycling) throw new Error('the validator is being recycled; try again in a moment');

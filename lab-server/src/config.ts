@@ -16,6 +16,15 @@ export const CHAIN_ID = 31337;
 
 export const IDL_PATH = resolve(LAB_ROOT, 'orderbook/target/wasm32-gear/release/orderbook.idl');
 export const WASM_PATH = resolve(LAB_ROOT, 'orderbook/target/wasm32-gear/release/orderbook.opt.wasm');
+export const LEDGER_IDL_PATH = resolve(LAB_ROOT, 'ledger/target/wasm32-gear/release/ledger.idl');
+
+export function ledgerAddress(): Address | null {
+  try {
+    return readAddr('ledger.addr');
+  } catch {
+    return null;
+  }
+}
 
 /** Anvil's default mnemonic; the ethexe dev node spawns Anvil with it (12 accounts). */
 export const ANVIL_MNEMONIC = 'test test test test test test test test test test test junk';

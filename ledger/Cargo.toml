@@ -1,0 +1,45 @@
+[package]
+name = "ledger"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Package allowing to build WASM binary for the program and IDL file for it"
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+ledger-app.workspace = true
+sails-rs = { workspace = true, features = ["ethexe", "gstd-panic-message"] }
+
+[dev-dependencies]
+ledger-app.workspace = true
+ledger-client.workspace = true
+sails-rs = { workspace = true, features = ["ethexe", "gtest"] }
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[build-dependencies]
+ledger-app.workspace = true
+sails-rs = { workspace = true, features = ["ethexe", "build"] }
+
+[workspace]
+resolver = "3"
+members = ["app", "client"]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Gear Technologies"]
+edition = "2024"
+rust-version = "1.91"
+repository = "https://github.com/gear-tech/ledger"
+license = "MIT"
+keywords = ["gear", "sails", "smart-contracts", "wasm", "no-std"]
+categories = ["cryptography::cryptocurrencies", "no-std", "wasm"]
+
+[workspace.dependencies]
+sails-rs = "2.0.0"
+tokio = "1.52.3"
+ledger-app = { version = "0.1.0", path = "app" }
+ledger-client = { version = "0.1.0", path = "client" }

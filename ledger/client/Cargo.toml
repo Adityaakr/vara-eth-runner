@@ -1,0 +1,18 @@
+[package]
+name = "ledger-client"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Package containing the client for the program allowing to interact with it"
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+sails-rs = { workspace = true, features = ["ethexe"] }
+
+[build-dependencies]
+ledger-app.workspace = true
+sails-rs = { workspace = true, features = ["ethexe", "build"] }

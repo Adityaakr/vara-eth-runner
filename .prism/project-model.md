@@ -51,6 +51,8 @@
 
 - ETHEXE LIMIT (2026-09-14): `MAX_OUTGOING_MESSAGES_PER_EXECUTION = 4` (`ethexe/runtime/common/src/lib.rs:114`); eth events count. A `place` that fills ≥4 makers panics with `OutgoingMessagesAmountLimitExceeded` (visible only with the `gstd-panic-message` feature, otherwise "panicked with '<unknown>'"). Program now caps fills at 3 per order (`MAX_FILLS_PER_ORDER`) and rests the remainder. Traffic generator cancels oldest resting orders above 24 per instance.
 
+- Wallet Send (2026-09-14): `ledger/` program (transfer/faucet/balance_of, 1 event per call), deployed by `run/deploy-ledger.sh` → `run/ledger.addr`; server commands `balance`, `prepare{kind:transfer|faucet|place}`; engine `prepareCall`/`queryRaw`; ledger records are `untracked` (L1 watcher follows only the order book). sails-js accepts a 20-byte hex for the `Address(H160)` struct.
+
 ## Decision log
 - 2026-09-14 G0: order book app; both write paths; no commits; Vite+React+viem UI, Node lab-server engine.
 

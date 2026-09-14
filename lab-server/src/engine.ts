@@ -137,8 +137,31 @@ export class LabEngine {
     return { tx, rec };
   }
 
+  /**
+   * Prepare an injected call to any program (used for the wallet's ledger). The record is marked
+   * untracked because the L1 watcher follows only the order book's logs.
+   */
+  async prepareCall(destination: Hex, payload: Hex, label: string): Promise<PreparedInjected> {
+    const rec = this.newRecord('injected', label, payload);
+    rec.untracked = destination.toLowerCase() !== this.chain.mirrorAddress.toLowerCase();
+    const tx = await this.createInjectedTx(payload, destination);
+    const latest = await this.chain.publicClient.getBlock({ blockTag: 'latest' });
+    await tx.setReferenceBlock(latest.hash);
+    rec.messageId = tx.messageId;
+    rec.txHash = tx.txHash;
+    rec.ethBlock = latest.number;
+    return { tx, rec };
+  }
+
+  /** Read-only call on any program at the validator's latest block; returns the raw reply payload. */
+  async queryRaw(destination: Hex, payload: Hex, source: Hex = this.chain.sender.address): Promise<Hex> {
+    const reply = await this.chain.api.call.program.calculateReplyForHandle(source, destination, payload, 0n);
+    if (!reply.code.isSuccess) throw new Error(`query failed: ${reply.code.reason}`);
+    return reply.payload;
+  }
+
   /** Submit a prepared (already signed) injected transaction; timing starts here. */
-  async sendPrepared({ tx, rec }: PreparedInjected, signer: 'anvil' | 'passkey', signerAddress: Hex): Promise<WriteRecord> {
+  async sendPrepared({ tx, rec }: PreparedInjected, signer: 'anvil' | 'passkey', signerAddress: Hex, decode?: (payload: Hex) => bigint): Promise<WriteRecord> {
     rec.signer = signer;
     rec.signerAddress = signerAddress;
     rec.tSubmit = performance.now();
@@ -161,7 +184,7 @@ export class LabEngine {
       rec.error = `program error: ${panicText(receipt.promise.payload) ?? receipt.promise.code.reason}`;
       return rec;
     }
-    rec.orderId = this.codec.decodePlaceReply(receipt.promise.payload);
+    rec.orderId = (decode ?? ((p: Hex) => this.codec.decodePlaceReply(p)))(receipt.promise.payload);
     return rec;
   }
 
@@ -273,9 +296,9 @@ export class LabEngine {
    * the node's `version` RPC, which v2.0.0 lacks, so it would sign the old byte layout and the node rejects
    * it with "Address mismatch". Overriding the digest source on the instance reconciles the two.
    */
-  async createInjectedTx(payload: Hex) {
+  async createInjectedTx(payload: Hex, destination: Hex = this.chain.mirrorAddress) {
     const tx = await this.chain.api.createInjectedTransaction({
-      destination: this.chain.mirrorAddress,
+      destination,
       payload,
       value: 0n,
     });

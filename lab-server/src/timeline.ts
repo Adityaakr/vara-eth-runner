@@ -35,6 +35,8 @@ export interface WriteRecord {
   signerAddress?: Hex;
   /** L1 path: the program replied with an error; the write was mined, so mined timing still counts. */
   replyError?: string;
+  /** True for programs the L1 watcher does not follow (the wallet ledger); excluded from settlement counts. */
+  untracked?: boolean;
   /** How many times a reorg rebuild cleared this record's committed stamp. */
   uncommittedByReorg?: number;
 }

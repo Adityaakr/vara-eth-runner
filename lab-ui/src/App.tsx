@@ -96,7 +96,7 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
         </details>
         <p className="note dim">{`Program instance ${snap.mirror} · single local validator on one machine; figures are measured, not quoted.`}</p>
       </div>
-      {wallet && <Wallet session={session} setSession={setSession} request={request} onClose={() => setWallet(false)} records={snap.records} />}
+      {wallet && <Wallet session={session} setSession={setSession} request={request} onClose={() => setWallet(false)} records={snap.records} ledger={snap.ledger} />}
       {controls && (
         <>
           <div className="scrim" onClick={() => setControls(false)} />
@@ -205,7 +205,7 @@ function TxTable({ records, mine }: { records: WriteRecord[]; mine?: string }) {
               <td className="mono dim2">{clock(r.submittedAt)}</td>
               <td className="mono dim2">{short(r.txHash ?? r.messageId)}</td>
               <td>{r.path === 'l1' ? <span className="tag">Ethereum tx</span> : r.signer === 'passkey' ? <span className="tag mint">Passkey</span> : <span className="mono dim2">{short(r.signerAddress)}</span>}</td>
-              <td className="mono">{r.label.startsWith('cancel') ? `Book.${r.label}` : r.label.replace('place ', 'Book.place ')}{r.orderId && !r.label.startsWith('cancel') ? <span className="dim">{` · #${r.orderId}`}</span> : null}{r.error ? <span className="tag red" title={r.error} style={{ marginLeft: 8 }}>rejected</span> : null}</td>
+              <td className="mono">{r.label.startsWith('cancel') ? `Book.${r.label}` : r.label.startsWith('transfer') || r.label === 'faucet' ? `Ledger.${r.label}` : r.label.replace('place ', 'Book.place ')}{r.orderId && !r.label.startsWith('cancel') && !r.label.startsWith('transfer') && r.label !== 'faucet' ? <span className="dim">{` · #${r.orderId}`}</span> : null}{r.error ? <span className="tag red" title={r.error} style={{ marginLeft: 8 }}>rejected</span> : null}</td>
               <td className="r">{r.error ? <span className="dim">—</span> : r.path === 'l1' ? <span className="dim2">none · mined only</span> : <span className={`lat ${lat !== undefined && lat >= 100 ? 'slow' : ''}`}><i style={{ width: `${Math.max(2, ((lat ?? 0) / scale) * 90)}px` }} /><b className="mono">{`${ms0(lat)} ms`}</b></span>}</td>
             </tr>
           );
@@ -215,10 +215,16 @@ function TxTable({ records, mine }: { records: WriteRecord[]; mine?: string }) {
   );
 }
 
-function Wallet({ session, setSession, request, onClose, records }: { session: PasskeySession | null; setSession: (s: PasskeySession | null) => void; request?: Req; onClose: () => void; records: WriteRecord[] }) {
+type Submitted = { at: number; label: string; result: string | null; preconfMs: number | null; signMs: number; totalMs: number; error: string | null };
+
+function Wallet({ session, setSession, request, onClose, records, ledger }: { session: PasskeySession | null; setSession: (s: PasskeySession | null) => void; request?: Req; onClose: () => void; records: WriteRecord[]; ledger: string | null }) {
+  const [tab, setTab] = useState<'send' | 'trade'>('send');
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState<Array<{ at: number; orderId: string | null; preconfMs: number | null; signMs: number; totalMs: number; error: string | null; label: string }>>([]);
+  const [submitted, setSubmitted] = useState<Submitted[]>([]);
+  const [balance, setBalance] = useState<string | null>(null);
+  const [to, setTo] = useState('');
+  const [amount, setAmount] = useState('10');
   const [price, setPrice] = useState('100');
   const [qty, setQty] = useState('1');
   const [side, setSide] = useState(0);
@@ -228,17 +234,33 @@ function Wallet({ session, setSession, request, onClose, records }: { session: P
     setBusy(label); setErr(null);
     try { await fn(); } catch (e) { setErr(String((e as Error).message ?? e)); } finally { setBusy(null); }
   };
-  const sendOrder = () => run('signing', async () => {
+  const refreshBalance = async () => {
+    if (!session || !request || !ledger) return;
+    const r = await request<{ balance: string }>({ type: 'balance', address: session.address }, 'balance');
+    setBalance(r.balance);
+  };
+  useEffect(() => { void refreshBalance().catch(() => undefined); }, [session?.address]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Prepare on the server, sign the hash here, submit; the server measures submit → signed result. */
+  const signAndSend = async (cmd: object, label: string) => {
     if (!session || !request) return;
     const t0 = performance.now();
-    const label = `${side === 0 ? 'Buy' : 'Sell'} ${qty} @ ${price}`;
-    const prep = await request<{ prepId: string; hash: `0x${string}` }>({ type: 'prepare', side, price, qty }, 'prepared');
+    const prep = await request<{ prepId: string; hash: `0x${string}` }>(cmd, 'prepared');
     const tSign = performance.now();
     const signature = await signInjectedHash(session, prep.hash);
     const signMs = performance.now() - tSign;
-    const res = await request<{ orderId: string | null; preconfMs: number | null; error: string | null }>({ type: 'submitSigned', prepId: prep.prepId, signature, address: session.address }, 'submitted');
-    setSubmitted((s) => [{ at: Date.now(), ...res, signMs, totalMs: performance.now() - t0, label }, ...s].slice(0, 8));
+    const res = await request<{ result: string | null; preconfMs: number | null; error: string | null }>({ type: 'submitSigned', prepId: prep.prepId, signature, address: session.address }, 'submitted');
+    setSubmitted((s) => [{ at: Date.now(), label, ...res, signMs, totalMs: performance.now() - t0 }, ...s].slice(0, 8));
+    return res;
+  };
+  const send = () => run('signing', async () => {
+    const res = await signAndSend({ type: 'prepare', kind: 'transfer', to, amount }, `Send ${amount} → ${to.slice(0, 6)}…${to.slice(-4)}`);
+    if (res && !res.error && res.result !== null) setBalance(res.result);
   });
+  const faucet = () => run('signing', async () => {
+    const res = await signAndSend({ type: 'prepare', kind: 'faucet' }, 'Faucet');
+    if (res && !res.error && res.result !== null) setBalance(res.result);
+  });
+  const trade = () => run('signing', async () => { await signAndSend({ type: 'prepare', kind: 'place', side, price, qty }, `${side === 0 ? 'Buy' : 'Sell'} ${qty} @ ${price}`); });
   return (
     <>
       <div className="scrim" onClick={onClose} />
@@ -251,31 +273,50 @@ function Wallet({ session, setSession, request, onClose, records }: { session: P
               <button className="btn" disabled={busy !== null} onClick={() => run('creating', async () => setSession(await createPasskey()))}>Create passkey</button>
               <button className="btn line" disabled={busy !== null} onClick={() => run('signing in', async () => setSession(await signInWithPasskey(remembered)))}>{remembered ? 'Use saved passkey' : 'Sign in'}</button>
             </div>
-            <p className="note">The authenticator releases the passkey's PRF secret after user verification. HKDF derives a secp256k1 signing key from it in this browser; the key is never stored or transmitted. The validator recovers the account address from each signature. Injected transactions require no balance: execution is paid from the program's executable balance.</p>
+            <p className="note">The authenticator releases the passkey's PRF secret after user verification. HKDF derives a secp256k1 signing key from it in this browser; the key is never stored or transmitted. The validator recovers the account address from each signature. Transactions need no gas balance: execution is paid from the program's executable balance.</p>
           </div>
         ) : (
           <div>
             <div className="kv2">
-              <div><div className="k">Status</div><div className="v">Signed in</div></div>
-              <div><div className="k">Signing method</div><div className="v"><span className="tag mint">Passkey</span></div></div>
+              <div><div className="k">Status</div><div className="v">Signed in · <span className="tag mint">Passkey</span></div></div>
+              <div><div className="k">Balance</div><div className="v big">{balance === null ? '—' : `${Number(balance).toLocaleString()} units`}</div></div>
               <div style={{ gridColumn: 'span 2' }}><div className="k">Account</div><div className="v">{session.address}</div></div>
-              <div><div className="k">Transactions from this account</div><div className="v">{mine.length}</div></div>
-              <div><div className="k">Best pre-confirmation</div><div className="v big">{(() => { const m = mine.map(preconfOf).filter((x): x is number => x !== undefined); return m.length ? `${Math.min(...m).toFixed(1)} ms` : '—'; })()}</div></div>
             </div>
-            <div className="form">
-              <div><label>Side</label><select value={side} onChange={(e) => setSide(Number(e.target.value))}><option value={0}>Buy</option><option value={1}>Sell</option></select></div>
-              <div><label>Price</label><input value={price} onChange={(e) => setPrice(e.target.value)} /></div>
-              <div><label>Quantity</label><input value={qty} onChange={(e) => setQty(e.target.value)} /></div>
-              <div><button className="btn" disabled={busy !== null} onClick={sendOrder}>{busy === 'signing' ? 'Signing…' : 'Submit'}</button></div>
+            <div className="tabs">
+              <button className={`tab ${tab === 'send' ? 'on' : ''}`} onClick={() => setTab('send')}>Send</button>
+              <button className={`tab ${tab === 'trade' ? 'on' : ''}`} onClick={() => setTab('trade')}>Trade</button>
+              <span style={{ flex: 1 }} />
+              <button className="btn line" onClick={() => void refreshBalance()}>Refresh</button>
+              <button className="btn line" onClick={() => { forgetPasskey(); setSession(null); setBalance(null); }}>Sign out</button>
             </div>
-            <div style={{ marginTop: 12 }}><button className="btn line" onClick={() => { forgetPasskey(); setSession(null); }}>Sign out</button></div>
+            {tab === 'send' ? (
+              <div>
+                {balance === '0' && <div className="faucet"><span>This account has no balance yet.</span><button className="btn" disabled={busy !== null} onClick={faucet}>{busy === 'signing' ? 'Signing…' : 'Get 1,000 test units'}</button></div>}
+                <div className="form send">
+                  <div><label>To</label><input value={to} onChange={(e) => setTo(e.target.value)} placeholder="0x…" spellCheck={false} /></div>
+                  <div><label>Amount</label><input value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+                  <div><button className="btn" disabled={busy !== null || !ledger} onClick={send}>{busy === 'signing' ? 'Signing…' : 'Submit'}</button></div>
+                </div>
+                <p className="note">Signed here with the passkey key, sent straight to the validator, no gas. The result is the validator's signed execution receipt; the balance shown is what it returned.</p>
+              </div>
+            ) : (
+              <div>
+                <div className="form">
+                  <div><label>Side</label><select value={side} onChange={(e) => setSide(Number(e.target.value))}><option value={0}>Buy</option><option value={1}>Sell</option></select></div>
+                  <div><label>Price</label><input value={price} onChange={(e) => setPrice(e.target.value)} /></div>
+                  <div><label>Quantity</label><input value={qty} onChange={(e) => setQty(e.target.value)} /></div>
+                  <div><button className="btn" disabled={busy !== null} onClick={trade}>{busy === 'signing' ? 'Signing…' : 'Submit'}</button></div>
+                </div>
+                <p className="note">Places an order on the lab's order book; it will trade against the autopilot's flow if it crosses.</p>
+              </div>
+            )}
             <div className="sub">
               <div className="k" style={{ color: 'var(--ink2)', fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase' }}>Submitted transactions</div>
-              {submitted.length === 0 && <div className="row dim">None yet.</div>}
+              {submitted.length === 0 && <div className="row dim">None yet.{mine.length ? ` ${mine.length} earlier from this account are on the tape.` : ''}</div>}
               {submitted.map((s) => (
                 <div className="row" key={s.at}>
-                  <div>{s.label}{s.orderId ? <span className="dim">{` · order #${s.orderId}`}</span> : null}<span className="dim mono" style={{ float: 'right' }}>{clock(s.at)}</span></div>
-                  <div>{s.error ? <span className="tag red">{s.error.slice(0, 60)}</span> : <span className="big">{`Pre-confirmed in ${ms0(s.preconfMs)} ms`}</span>}<span className="dim">{` · signed locally in ${s.signMs.toFixed(1)} ms · ${s.totalMs.toFixed(0)} ms end to end from this browser`}</span></div>
+                  <div>{s.label}<span className="dim mono" style={{ float: 'right' }}>{clock(s.at)}</span></div>
+                  <div>{s.error ? <span className="tag red">{s.error.slice(0, 70)}</span> : <span className="big">{`Pre-confirmed in ${ms0(s.preconfMs)} ms`}</span>}<span className="dim">{` · signed locally in ${s.signMs.toFixed(1)} ms · ${s.totalMs.toFixed(0)} ms end to end${s.result !== null && !s.error && !s.label.startsWith('Buy') && !s.label.startsWith('Sell') ? ` · balance ${Number(s.result).toLocaleString()}` : ''}`}</span></div>
                 </div>
               ))}
             </div>
