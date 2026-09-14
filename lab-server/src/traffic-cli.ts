@@ -17,7 +17,18 @@ const burstSize = Math.max(0, Number(process.argv[5] ?? 120));
 async function main() {
   const mirrors = (process.env.LAB_MIRRORS ?? '').split(',').filter(Boolean) as `0x${string}`[];
   const { engines } = await openEngines(senders, 9, mirrors);
-  const price = 2_000_000n + BigInt(Date.now() % 1_000_000);
+  // Realistic-looking flow: each program instance has a mid price that random-walks; bids land a
+  // little above it and asks a little below, so they still cross and the book stays bounded.
+  const mids = engines.map(() => 2_000_000 + Math.floor(Math.random() * 500_000));
+  const nextOrder = (idx: number): { side: number; price: bigint; qty: bigint } => {
+    mids[idx] += Math.round((Math.random() - 0.5) * 6);
+    const side = nextSide(idx);
+    const skew = Math.floor(Math.random() * 4);
+    const price = BigInt(side === SIDE_BID ? mids[idx] + skew : mids[idx] - skew);
+    const r = Math.random();
+    const qty = BigInt(r < 0.6 ? 1 + Math.floor(Math.random() * 5) : r < 0.9 ? 5 + Math.floor(Math.random() * 20) : 25 + Math.floor(Math.random() * 100));
+    return { side, price, qty };
+  };
   let i = 0;
   let inFlight = 0;
   // Alternate side per engine (i.e. per program instance), otherwise an instance that only ever
@@ -30,11 +41,11 @@ async function main() {
   const fire = () => {
     const idx = i % engines.length;
     const engine = engines[idx];
-    const side = nextSide(idx);
+    const { side, price, qty } = nextOrder(idx);
     i++;
     inFlight++;
     engine
-      .placeInjected(side, price, 1n)
+      .placeInjected(side, price, qty)
       .then((rec) => console.log(JSON.stringify({ record: rec }, bigintReplacer)))
       .catch((err) => console.error('send failed', err))
       .finally(() => inFlight--);
@@ -60,10 +71,10 @@ async function main() {
           burstInFlight++;
           const idx = i % engines.length;
           const engine = engines[idx];
-          const side = nextSide(idx);
+          const { side, price, qty } = nextOrder(idx);
           i++;
           engine
-            .placeInjected(side, price, 1n)
+            .placeInjected(side, price, qty)
             .then((rec) => console.log(JSON.stringify({ record: rec }, bigintReplacer)))
             .catch((err) => console.error('burst send failed', err))
             .finally(() => {
