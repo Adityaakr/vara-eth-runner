@@ -10,6 +10,7 @@ import type { WriteRecord } from './timeline.js';
 import { L1Watcher, type ObservedEvent } from './l1watch.js';
 import type { BookView } from './sails.js';
 
+const REF_BLOCK_LAG = Number(process.env.LAB_REF_BLOCK_LAG ?? 0);
 const RECEIPT_TIMEOUT_MS = Number(process.env.LAB_RECEIPT_TIMEOUT_MS ?? 10_000);
 
 function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
@@ -90,7 +91,9 @@ export class LabEngine {
     const rec = this.newRecord('injected', `place ${sideLabel(side)} ${qty}@${price}`, payload);
     const tx = await this.createInjectedTx(payload);
     // Anchor at the current head (the library default is head-3) so "blocks from anchor" is comparable with L1.
-    const head = await this.chain.publicClient.getBlock({ blockTag: 'latest' });
+    // LAB_REF_BLOCK_LAG anchors N blocks behind Anvil's head, in case the node has not synced the newest block yet.
+    const latest = await this.chain.publicClient.getBlock({ blockTag: 'latest' });
+    const head = REF_BLOCK_LAG > 0 ? await this.chain.publicClient.getBlock({ blockNumber: latest.number - BigInt(REF_BLOCK_LAG) }) : latest;
     await tx.setReferenceBlock(head.hash);
     rec.messageId = tx.messageId;
     rec.txHash = tx.txHash;

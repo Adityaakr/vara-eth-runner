@@ -82,15 +82,27 @@ export class NetEmulator {
       const up = new WebSocket(this.upstream);
       up.on('error', (e) => { this.counters.upErrors++; console.error('[netem] upstream error', e.message); });
       const pending: Array<{ data: Buffer; binary: boolean }> = [];
+      // Per direction: when the last frame was scheduled to leave, and when it arrived. Jitter may
+      // stretch the gap between consecutive frames but never compress it: the validator's subscription
+      // acknowledgement and its first notification can be ~20 ms apart, and delivering them back to
+      // back makes the client drop the notification.
       let lastToUp = 0;
       let lastToClient = 0;
+      let lastArrivedUp = 0;
+      let lastArrivedDown = 0;
       // `ws` may hand out a slice of its internal receive buffer; it is overwritten by later frames,
       // so a delayed forward must copy the bytes first or bursts corrupt in-flight messages.
       const send = (dst: WebSocket, raw: RawData, binary: boolean, dir: 'up' | 'down') => {
         const data = Array.isArray(raw) ? Buffer.concat(raw.map((b) => Buffer.from(b))) : Buffer.from(raw as Buffer);
         const now = performance.now();
-        const at = Math.max(now + this.delay(), dir === 'up' ? lastToUp : lastToClient); // never reorder
-        if (dir === 'up') lastToUp = at; else lastToClient = at;
+        const lastAt = dir === 'up' ? lastToUp : lastToClient;
+        const lastArrived = dir === 'up' ? lastArrivedUp : lastArrivedDown;
+        const gap = lastArrived === 0 ? Infinity : now - lastArrived;
+        // Never reorder; and for frames that arrived close together (an ack and its first
+        // notification) never compress their spacing. Only close frames are tied, otherwise positive
+        // jitter would ratchet the schedule later and later over thousands of frames.
+        const at = Math.max(now + this.delay(), lastAt, gap <= 40 ? lastAt + gap : 0);
+        if (dir === 'up') { lastToUp = at; lastArrivedUp = now; } else { lastToClient = at; lastArrivedDown = now; }
         if (dir === 'up') this.counters.up++; else this.counters.down++;
         setTimeout(() => {
           if (dst.readyState === dst.OPEN) {

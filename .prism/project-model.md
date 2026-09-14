@@ -46,6 +46,9 @@
 
 - ROOT CAUSE of validator slowdown (2026-09-14): `ethexe run --dev --tmp` persists every micro-block to RocksDB and never prunes: 64 GB after 41 min at 25 tx/s (31k MBs), 135% CPU, MB cadence 10 → 80 ms. 23 abandoned tmp stores held 145 GB. start-node.sh now deletes `$TMPDIR/ethexe*` on start; serve.ts recycles node+deploy every LAB_RECYCLE_MINUTES (10) or when validator-side p50 (measured − emulated wire) > LAB_RECYCLE_VALIDATOR_MS (60) for 30 s; autopilot default lowered to 12 tx/s, surges 120@12 every 90 s.
 
+- Emulator lesson (2026-09-14): independent per-frame jitter can deliver the validator's subscription ack and its first notification back to back, and the JS client drops the notification (2–3% "no receipt"). Fix: never compress spacing between frames that arrived ≤ 40 ms apart, but do not tie distant frames or positive jitter ratchets the schedule (delays grow unbounded). Direct path: 0/400 failures; emulated after fix: 0/650.
+- Recycle watch: 12 min at 12 tx/s, p50 182–192 ms throughout, scheduled recycle at 10 min took ~30 s, store 1.4 GB → reset. `LAB_REF_BLOCK_LAG` env exists but made no difference.
+
 ## Decision log
 - 2026-09-14 G0: order book app; both write paths; no commits; Vite+React+viem UI, Node lab-server engine.
 
