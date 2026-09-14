@@ -30,7 +30,7 @@ const DEFAULT_AUTOPILOT_RATE = Number(process.env.LAB_AUTOPILOT_RATE ?? 12);
 const RECYCLE_EVERY_MIN = Number(process.env.LAB_RECYCLE_MINUTES ?? 30);
 /** Recycle when the node's --tmp store exceeds this size. The store, not latency, is the real trigger:
  * latency also rises from queueing under load and would recycle in a loop at high rates. */
-const RECYCLE_STORE_GB = Number(process.env.LAB_RECYCLE_STORE_GB ?? 8);
+const RECYCLE_STORE_GB = Number(process.env.LAB_RECYCLE_STORE_GB ?? 40);
 const NETEM_PORT = Number(process.env.LAB_NETEM_PORT ?? 9945);
 const CALIBRATION_URL = process.env.LAB_CALIBRATE_URL ?? 'wss://rpc.vara.network';
 const DEFAULT_NET_PROFILE = (process.env.LAB_NET_PROFILE ?? 'measured') as NetProfile['name'];
@@ -132,17 +132,24 @@ async function main() {
     lastStoreGb = storeGb();
     if (lastStoreGb > RECYCLE_STORE_GB) void recycle(`validator store ${lastStoreGb.toFixed(1)} GB > ${RECYCLE_STORE_GB} GB`).catch((e) => console.error('recycle failed', e));
   }, 30_000);
-  let autopilot: { child: ChildProcess | null; rate: number } = { child: null, rate: 0 };
+  /** One traffic process signs ~290 tx/s; above ~120 tx/s per process latency creeps, so the rate is split. */
+  const PER_CHILD = 120;
+  let autopilot: { children: ChildProcess[]; rate: number } = { children: [], rate: 0 };
   const setAutopilot = (rate: number) => {
-    if (autopilot.child) {
-      autopilot.child.kill('SIGTERM');
-      autopilot = { child: null, rate: 0 };
-    }
+    for (const c of autopilot.children) c.kill('SIGTERM');
+    autopilot = { children: [], rate: 0 };
     if (rate <= 0) return;
+    const n = Math.max(1, Math.ceil(rate / PER_CHILD));
+    const children: ChildProcess[] = [];
+    for (let k = 0; k < n; k++) children.push(spawnTraffic(rate / n, k));
+    autopilot = { children, rate };
+  };
+  const spawnTraffic = (rate: number, k: number): ChildProcess => {
     const mirrorsFile = resolve(LAB_ROOT, 'run/mirrors.txt');
     // Traffic uses at most the first 4 instances; a 5th, if deployed, stays quiet for the live tests.
     const mirrors = existsSync(mirrorsFile) ? readFileSync(mirrorsFile, 'utf8').split('\n').filter(Boolean).slice(0, 4).join(',') : '';
-    const child = spawn(process.execPath, [tsxBin(), resolve(dirname(fileURLToPath(import.meta.url)), 'traffic-cli.ts'), String(rate), String(BLAST_SENDERS)], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, LAB_MIRRORS: mirrors } });
+    // Only the first child fires surges; each child signs from its own set of accounts.
+    const child = spawn(process.execPath, [tsxBin(), resolve(dirname(fileURLToPath(import.meta.url)), 'traffic-cli.ts'), String(rate), String(BLAST_SENDERS), k === 0 ? '90' : '0'], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, LAB_MIRRORS: mirrors, LAB_FIRST_SENDER: String(9 + k * BLAST_SENDERS) } });
     child.stderr.on('data', (d) => process.stderr.write(`[traffic] ${d}`));
     createInterface({ input: child.stdout }).on('line', (line) => {
       try {
@@ -153,13 +160,12 @@ async function main() {
       }
     });
     child.on('exit', (code) => {
-      if (autopilot.child === child) autopilot = { child: null, rate: 0 };
       if (code && code !== 0) console.error(`traffic child exited ${code}`);
     });
-    autopilot = { child, rate };
+    return child;
   };
   setAutopilot(DEFAULT_AUTOPILOT_RATE);
-  process.on('exit', () => autopilot.child?.kill('SIGTERM'));
+  process.on('exit', () => { for (const c of autopilot.children) c.kill('SIGTERM'); });
 
   const wss = new WebSocketServer({ host: '127.0.0.1', port: PORT });
   console.log(`lab-server listening on ws://127.0.0.1:${PORT}; mirror ${chain.mirrorAddress}`);
@@ -266,7 +272,7 @@ async function main() {
           allTimeMinMs: Number.isFinite(allTime.minMs) ? allTime.minMs : null,
           allTimeMeanMs: allTime.preconfirmed ? allTime.sumMs / allTime.preconfirmed : null,
         },
-        autopilot: { rate: autopilot.rate, running: autopilot.child !== null },
+        autopilot: { rate: autopilot.rate, running: autopilot.children.length > 0 },
         validator: { startedAt: validator.startedAt, uptimeSec: Math.floor((Date.now() - validator.startedAt) / 1000), recycles: validator.recycles, lastRecycleAt: validator.lastRecycleAt, recycling: validator.recycling, lastReason: validator.lastReason, recycleEveryMin: RECYCLE_EVERY_MIN, storeGb: lastStoreGb, storeLimitGb: RECYCLE_STORE_GB },
         network: { profile: netem.profile.name, oneWayMs: netem.profile.oneWayMs, jitterMs: netem.profile.jitterMs, note: netem.profile.note, calibration: cal, profiles: Object.values(table).map((p) => ({ name: p.name, oneWayMs: p.oneWayMs, note: p.note })) },
         latency: { preconf: preconfLat, e2e, histogram },
@@ -333,7 +339,7 @@ async function main() {
       if (!p) throw new Error('unknown network profile');
       netem.profile = p;
     } else if (cmd.type === 'autopilot') {
-      const rate = Math.min(300, Math.max(0, Number(cmd.rate) || 0));
+      const rate = Math.min(600, Math.max(0, Number(cmd.rate) || 0)); // 600 ≈ the validator's measured sustained ceiling here
       setAutopilot(rate);
     } else if (cmd.type === 'balance') {
       if (!ledger || !ledgerAddr) throw new Error('ledger not deployed');

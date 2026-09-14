@@ -7,7 +7,7 @@ export PATH="$HOME/.foundry/bin:$PATH"
 WASM="$LAB/ledger/target/wasm32-gear/release/ledger.opt.wasm"
 ROUTER="$(cat "$LAB/run/router.addr")"
 SENDER="${SENDER:-0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc}"
-EXEC_BALANCE="${EXEC_BALANCE:-1000000000000000}"
+EXEC_BALANCE="${EXEC_BALANCE:-25000000000000000}"
 TX="$ETHEXE --cfg none tx --ethereum-rpc ws://127.0.0.1:8545 --ethereum-router $ROUTER --sender $SENDER"
 UP=$($TX upload "$WASM" --watch --json)
 CODE_ID=$(echo "$UP" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("code_id") or d.get("codeId"))')

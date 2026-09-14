@@ -16,7 +16,8 @@ const burstSize = Math.max(0, Number(process.argv[5] ?? 120));
 
 async function main() {
   const mirrors = (process.env.LAB_MIRRORS ?? '').split(',').filter(Boolean) as `0x${string}`[];
-  const { engines } = await openEngines(senders, 9, mirrors);
+  const firstSender = Number(process.env.LAB_FIRST_SENDER ?? 9);
+  const { engines } = await openEngines(senders, firstSender, mirrors);
   // Realistic-looking flow that cannot fill the book: each instance has a drifting mid price, but a
   // new bid is never below the last ask and a new ask never above the last bid on that instance, so
   // every order crosses the previous opposite one. Only remainders rest, and the next order clears them.

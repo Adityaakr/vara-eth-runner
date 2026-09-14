@@ -7,7 +7,7 @@ export PATH="$HOME/.foundry/bin:$PATH"
 WASM="$LAB/orderbook/target/wasm32-gear/release/orderbook.opt.wasm"
 ROUTER="$(cat "$LAB/run/router.addr")"
 SENDER="${SENDER:-0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc}"   # Anvil #2 = ethexe dev "Sender #1"
-EXEC_BALANCE="${EXEC_BALANCE:-1000000000000000}"               # raw WVARA units (12 decimals => 1000 WVARA)
+EXEC_BALANCE="${EXEC_BALANCE:-25000000000000000}"              # raw WVARA units (12 decimals => 25,000 WVARA; ~1,000 WVARA ≈ 6k executions)
 INSTANCES="${INSTANCES:-5}"                                    # instances: traffic uses the first 4, live tests the 5th
 TX="$ETHEXE --cfg none tx --ethereum-rpc ws://127.0.0.1:8545 --ethereum-router $ROUTER --sender $SENDER"
 echo "uploading $WASM as $SENDER via router $ROUTER"

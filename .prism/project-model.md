@@ -57,6 +57,8 @@
 
 - MAX THROUGHPUT (2026-09-14): pre-signed fire-and-forget to 16 `counter` programs → validator executes ~800/s peak, 500–600/s sustained for few-thousand bursts, 358/s when the mempool (~10k) is saturated (9,396-tx MB). Client signing 290/s per process was the live-path cap. Executable balance: 1,000 WVARA ≈ 6k pings (`InsufficientBalanceForInjectedMessages`); use 25k WVARA for load instances. Reference block must be < 32 blocks old at submission; `send()` rejections are objects (`{Reject:{reason}}`). Store recycle fired mid-run at 8.3 GB; pause recycling for benchmarks.
 
+- LIVE PATH at 500 requested (2026-09-14): autopilot split across 5 signing processes (120 tx/s each) → ~400 tx/s sustained through the emulated wire, p50 ≈ 300–350 ms, 10 failures in 27k. Store grows ~2.7 GB/min at that rate; recycle threshold raised to 40 GB. Instances funded with 25k WVARA (counters from Anvil #3).
+
 ## Decision log
 - 2026-09-14 G0: order book app; both write paths; no commits; Vite+React+viem UI, Node lab-server engine.
 

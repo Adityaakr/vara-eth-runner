@@ -6,8 +6,8 @@ ETHEXE="$LAB/gear/target/release/ethexe"
 export PATH="$HOME/.foundry/bin:$PATH"
 WASM="$LAB/counter/target/wasm32-gear/release/counter.opt.wasm"
 ROUTER="$(cat "$LAB/run/router.addr")"
-SENDER="${SENDER:-0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc}"
-EXEC_BALANCE="${EXEC_BALANCE:-1000000000000000}"
+SENDER="${SENDER:-0x90f79bf6eb2c4f870365e785982e1f101e93b906}"   # Anvil #3: keeps its 500k WVARA separate from the main deploy
+EXEC_BALANCE="${EXEC_BALANCE:-25000000000000000}"
 INSTANCES="${INSTANCES:-4}"
 TX="$ETHEXE --cfg none tx --ethereum-rpc ws://127.0.0.1:8545 --ethereum-router $ROUTER --sender $SENDER"
 # The Router rejects re-validation of known code; reuse the code id once uploaded on this stack.
