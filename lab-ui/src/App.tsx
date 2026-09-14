@@ -31,8 +31,6 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
   const [session, setSession] = useState<PasskeySession | null>(null);
   const stuck = snap.records.filter((r) => !r.error && r.tCommitted === undefined && snap.now - r.submittedAt > STUCK_AFTER_MS).length;
   const pre = snap.latency.preconf;
-  const safeDepth = snap.node.quarantine + 1;
-  const gap = Number(snap.preconf.seq) - Number(snap.committed.seq);
   return (
     <div>
       <div className="mast">
@@ -62,28 +60,12 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
           <TxTable records={snap.records} mine={session?.address} />
         </div>
 
-        <div className="grid2">
-          <div className="panel">
-            <h2>Ethereum settlement <span className="r">program events committed per block</span></h2>
-            <table>
-              <thead><tr><th>Height</th><th>Block hash</th><th className="r">Settled tx</th><th className="r">Time</th></tr></thead>
-              <tbody>{snap.blocks.slice(0, 10).map((b) => <tr key={b.number}><td className="mono">{b.number}</td><td className="mono dim2">{short(b.hash)}</td><td className="r mono">{n(b.txs)}</td><td className="r mono dim">{new Date(b.timestamp * 1000).toLocaleTimeString(undefined, { hour12: false })}</td></tr>)}</tbody>
-            </table>
-          </div>
-          <div className="panel">
-            <h2>Settlement and safety</h2>
-            <table className="kv">
-              <tbody>
-                <tr><td>Pre-confirmation → settlement, median</td><td>{snap.stats.injected.preconfToCommitted ? `${(snap.stats.injected.preconfToCommitted.p50 / 1000).toFixed(2)} s` : '—'}</td></tr>
-                <tr><td>Ethereum transaction, time to mine, median</td><td>{snap.stats.l1.submitToL1Mined ? `${(snap.stats.l1.submitToL1Mined.p50 / 1000).toFixed(2)} s` : '—'}</td></tr>
-                <tr><td>Validator state vs Ethereum state</td><td>{gap === 0 ? <span className="tag mint">identical</span> : <span className="tag amber">{`validator ahead by ${gap}`}</span>}</td></tr>
-                <tr><td>Validator anchor depth</td><td>{`${safeDepth} block${safeDepth === 1 ? '' : 's'}`}</td></tr>
-                <tr><td>Ethereum block time</td><td>{`${snap.node.blockTime} s`}</td></tr>
-                <tr><td>Reorganisations observed</td><td>{snap.watcher.reorgs}</td></tr>
-              </tbody>
-            </table>
-            <p className="note">A pre-confirmation is the validator's signed execution result and is available within milliseconds. Settlement occurs when the Router commits a batch to Ethereum and the program's events appear in the Mirror contract's logs, typically one to three blocks later. Until then the result is backed by the validator's signature, not by Ethereum.</p>
-          </div>
+        <div className="panel" style={{ marginTop: 14 }}>
+          <h2>Ethereum settlement <span className="r">program events committed per block</span></h2>
+          <table>
+            <thead><tr><th>Height</th><th>Block hash</th><th className="r">Settled tx</th><th className="r">Time</th></tr></thead>
+            <tbody>{snap.blocks.slice(0, 10).map((b) => <tr key={b.number}><td className="mono">{b.number}</td><td className="mono dim2">{short(b.hash)}</td><td className="r mono">{n(b.txs)}</td><td className="r mono dim">{new Date(b.timestamp * 1000).toLocaleTimeString(undefined, { hour12: false })}</td></tr>)}</tbody>
+          </table>
         </div>
 
         <p className="note dim">{`Program instance ${snap.mirror} · single local validator on one machine; figures are measured, not quoted.`}</p>
