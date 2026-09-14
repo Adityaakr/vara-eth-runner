@@ -1,10 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
-  <rect width="108" height="108" rx="20" fill="#1c1b33"/>
-  <g fill="#8a86b8">
-    <circle cx="86" cy="17" r="2.4"/><circle cx="12" cy="44" r="2"/><circle cx="24" cy="90" r="2.2"/><circle cx="94" cy="92" r="2"/>
+  <rect width="108" height="108" rx="22" fill="#b6f5d5"/>
+  <g transform="translate(24 32) scale(0.56)" fill="#1c1b33">
+    <!-- V -->
+    <path d="M0 4 H14 L34 48 L54 4 H68 L42 62 H26 Z"/>
+    <!-- angular C -->
+    <path d="M66 4 H108 V16 H74 L64 33 L74 50 H108 V62 H66 L50 33 Z"/>
   </g>
-  <!-- mint V -->
-  <path d="M4 33 H20 L38 70 L56 33 H72 L45 84 H31 Z" fill="#00ffc4"/>
-  <!-- white angular C, its chevron point tucked against the V's right arm -->
-  <path d="M68 33 H104 V45 H74 L64 57 L74 69 H104 V81 H68 L50 57 Z" fill="#ffffff"/>
 </svg>
