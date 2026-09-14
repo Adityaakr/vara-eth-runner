@@ -53,7 +53,6 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
         <div className="tiles">
           <div className="tile"><div className="k">Latest height</div><div className="v">{snap.ethHead}</div></div>
           <div className="tile"><div className="k">Median pre-confirm</div><div className="v mint">{ms0(pre?.p50)}<u>ms</u></div><div className="s">{pre ? `n ${n(pre.count)}` : '—'}</div></div>
-          <div className="tile"><div className="k">P95</div><div className="v">{ms0(pre?.p95)}<u>ms</u></div><div className="s">{pre ? `max ${ms0(pre.max)}` : '—'}</div></div>
           <div className="tile"><div className="k">Fastest</div><div className="v mint">{ms0(snap.totals.allTimeMinMs, 1)}<u>ms</u></div><div className="s">since start</div></div>
           <div className="tile"><div className="k">Pre-confirmed txs</div><div className="v">{n(snap.totals.preconfirmed)}</div><div className="s">since start</div></div>
         </div>
