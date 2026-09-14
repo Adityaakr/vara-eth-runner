@@ -17,7 +17,7 @@ const snap = await new Promise<Snapshot>((resolve, reject) => {
   ws.on('error', reject);
 });
 const html = renderToString(<LabView snap={snap} lastError={null} send={() => {}} />);
-const must = ['Pre-confirmation telemetry', 'Median pre-confirm', 'Pre-confirmed transactions per second', 'Latency distribution', 'Transactions', 'Ethereum settlement', 'Comparison and fault injection', `event sequence ${snap.preconf.seq}`];
+const must = ['Pre-confirmation telemetry', 'Median pre-confirm', 'pre-confirmed in the last 3 min', 'Latency distribution', 'Transactions', 'Ethereum settlement', 'Comparison and fault injection', `event sequence ${snap.preconf.seq}`];
 const missing = must.filter((m) => !html.includes(m));
 if (missing.length) {
   console.error('render-check FAILED, missing:', missing);
