@@ -212,6 +212,15 @@ async function main() {
     const histogram = edges.slice(0, -1).map((lo, i) => ({ lo, hi: edges[i + 1], count: preconfLatencies.filter((x) => x >= lo && x < edges[i + 1]).length }));
     const e2e = summarize(records.filter((r) => !r.error && r.tCommitted !== undefined).map((r) => r.tCommitted! - r.tSubmit));
     const series = throughputSeries(records, now);
+    // Fine series: 500 ms buckets over the same window for the dense band.
+    const FINE_MS = 500;
+    const fineCount = (HISTORY_SECONDS * 1000) / FINE_MS;
+    const fineStart = Math.floor(now / FINE_MS) * FINE_MS - (fineCount - 1) * FINE_MS;
+    const fine = new Array<number>(fineCount).fill(0);
+    for (const r of records) {
+      const p = wallOf(r, r.tPreconf);
+      if (p !== undefined && p >= fineStart) fine[Math.min(fineCount - 1, Math.floor((p - fineStart) / FINE_MS))]++;
+    }
     // Per-transaction latency points for the last HISTORY_SECONDS, thinned to a bounded count.
     const windowStart = now - HISTORY_SECONDS * 1000;
     const rawPoints = injected
@@ -248,6 +257,7 @@ async function main() {
         throughput: { series, lastSecond: lastSecond.preconf, peak: Math.max(...series.map((b) => b.preconf)) },
         points,
         windowSeconds: HISTORY_SECONDS,
+        fine: { start: fineStart, stepMs: FINE_MS, counts: fine },
         blocks: await blockRows().catch(() => []),
         records: records.slice(-40).map((r) => ({ ...r, wallPreconf: wallOf(r, r.tPreconf), wallCommitted: wallOf(r, r.tCommitted) })),
         stats: { injected: statsFor(records, 'injected'), l1: statsFor(records, 'l1') },

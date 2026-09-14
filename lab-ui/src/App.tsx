@@ -112,14 +112,11 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
 }
 
 /**
- * Latency field: every pre-confirmed transaction is a point placed by the moment its signed result
- * arrived (x) and how long that took (y). The strip scrolls continuously; positions are fixed per
- * snapshot and the whole group is translated by the time elapsed since, so it is cheap to animate.
+ * Dense throughput band: half-second buckets, lightly smoothed, gapless layered bars that glide
+ * continuously. Scaled to the 98th percentile so steady traffic sits high with a live, textured crest.
  */
 function Band({ snap }: { snap: Snapshot }) {
-  const W = 1000;
-  const H = 100;
-  const windowMs = snap.windowSeconds * 1000;
+  const { start, stepMs, counts } = snap.fine;
   const [now, setNow] = useState(snap.now);
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -128,58 +125,22 @@ function Band({ snap }: { snap: Snapshot }) {
     raf = window.requestAnimationFrame(loop);
     return () => window.cancelAnimationFrame(raf);
   }, []);
-  const pts = snap.points;
-  const sortedMs = pts.map((p) => p.ms).sort((a, b) => a - b);
-  const p95 = sortedMs[Math.floor(sortedMs.length * 0.95)] ?? 0;
-  const maxMs = Math.min(800, Math.max(300, Math.ceil((p95 * 1.25) / 50) * 50));
-  const x = (t: number) => ((t - (snap.now - windowMs)) / windowMs) * W;
-  const y = (ms: number) => H - (Math.min(ms, maxMs) / maxMs) * (H - 6) - 3;
-  const shift = ((now - snap.now) / windowMs) * W;
-  const med = snap.throughput.series.map((b) => (b.p50 === null ? null : `${x(b.t + 500).toFixed(1)},${y(b.p50).toFixed(1)}`));
-  const segs: string[] = [];
-  let cur: string[] = [];
-  for (const m of med) { if (m) cur.push(m); else if (cur.length > 1) { segs.push(cur.join(' ')); cur = []; } else cur = []; }
-  if (cur.length > 1) segs.push(cur.join(' '));
-  const guides = [100, 200, 250].filter((g) => g < maxMs);
-  const tps = snap.throughput.series;
-  const maxTps = Math.max(6, ...tps.map((b) => b.preconf));
-  const bw = W / tps.length;
+  // Light smoothing (3-bucket weighted average) keeps the crest textured without single-bucket spikes.
+  const smoothed = counts.map((c, i) => (0.25 * (counts[i - 1] ?? c) + 0.5 * c + 0.25 * (counts[i + 1] ?? c)));
+  const sorted = [...smoothed].sort((a, b) => a - b);
+  const p98 = sorted[Math.floor(sorted.length * 0.98)] ?? 0;
+  const maxV = Math.max(3, p98 * 1.08);
+  const n0 = counts.length;
+  const barW = 100 / n0;
+  // The last bucket is still filling; the strip shifts left by the elapsed fraction of it.
+  const elapsed = Math.min(1, Math.max(0, (now - (start + (n0 - 1) * stepMs)) / stepMs));
   return (
-    <div className="field">
-      <div className="field-head">
-        <span><i className="dot mint" />pre-confirmation time per transaction</span>
-        <span><i className="dot line" />median per second</span>
-        <span className="right">{`last ${snap.windowSeconds} s · ${n(pts.length)} transactions`}</span>
-      </div>
-      <div className="field-plot">
-        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-          <defs>
-            <filter id="dotglow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="1.6" /></filter>
-            <linearGradient id="fieldfade" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stopColor="#0c0c1c" stopOpacity="1" /><stop offset="0.12" stopColor="#0c0c1c" stopOpacity="0" /></linearGradient>
-          </defs>
-          {guides.map((g) => <g key={g}><line x1={0} x2={W} y1={y(g)} y2={y(g)} stroke={g === 250 ? '#f2b544' : '#26254a'} strokeWidth="1" strokeDasharray={g === 250 ? '6 4' : '2 5'} vectorEffect="non-scaling-stroke" opacity={g === 250 ? 0.55 : 1} /></g>)}
-          <g transform={`translate(${-shift} 0)`}>
-            {pts.map((p, i) => {
-              const age = (now - p.t) / windowMs;
-              const slow = p.ms > 250;
-              return <circle key={i} cx={x(p.t)} cy={y(p.ms)} r={p.signer === 'passkey' ? 3.2 : 1.9} fill={slow ? '#f2b544' : p.signer === 'passkey' ? '#ffffff' : '#00ffc4'} opacity={0.25 + (1 - age) * 0.7} filter="url(#dotglow)" vectorEffect="non-scaling-stroke" />;
-            })}
-            {segs.map((d, i) => <polyline key={i} points={d} fill="none" stroke="#9cc8ff" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" opacity="0.9" />)}
-          </g>
-          <rect x={0} y={0} width={W} height={H} fill="url(#fieldfade)" pointerEvents="none" />
-        </svg>
-        {guides.map((g) => <span key={g} className={`ax ${g === 250 ? 'amber' : ''}`} style={{ top: `${(y(g) / H) * 100}%` }}>{`${g} ms`}</span>)}
-        <span className="ax top">{`${maxMs} ms`}</span>
-        <span className="ax bottom">0</span>
-        <div className="live-edge"><i /></div>
-      </div>
-      <div className="field-tps">
-        <svg viewBox={`0 0 ${W} 22`} preserveAspectRatio="none">
-          <g transform={`translate(${-shift} 0)`}>
-            {tps.map((b) => { const h = (b.preconf / maxTps) * 22; return <rect key={b.t} x={x(b.t)} y={22 - h} width={Math.max(0.8, bw - 0.8)} height={h} fill="#00c896" opacity="0.55" />; })}
-          </g>
-        </svg>
-        <span className="ax tpslbl">{`tx/s · peak ${snap.throughput.peak}`}</span>
+    <div className="band">
+      <div className="band-clip">
+        <div className="band-strip" style={{ width: `${100 + barW}%`, transform: `translateX(${-elapsed * barW}%)` }}>
+          {smoothed.map((v, i) => <div key={start + i * stepMs} className="bar" style={{ height: `${Math.min(1, v / maxV) * 100}%` }} />)}
+          <div className="bar ghost" />
+        </div>
       </div>
     </div>
   );

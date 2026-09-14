@@ -54,6 +54,7 @@ export type Snapshot = {
   throughput: { series: Bucket[]; lastSecond: number; peak: number };
   points: { t: number; ms: number; signer: 'anvil' | 'passkey' }[];
   windowSeconds: number;
+  fine: { start: number; stepMs: number; counts: number[] };
   blocks: BlockRow[];
   records: WriteRecord[];
   stats: { injected: PathStats; l1: PathStats };
