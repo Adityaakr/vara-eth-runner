@@ -87,10 +87,6 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
           </div>
         </div>
 
-        <details className="panel" style={{ marginTop: 14 }}>
-          <summary><h2>Comparison and fault injection <span className="r">Ethereum transaction path · forced reorganisation · dual view of program state</span></h2></summary>
-          <Stress send={send} snap={snap} safeDepth={safeDepth} />
-        </details>
         <p className="note dim">{`Program instance ${snap.mirror} · single local validator on one machine; figures are measured, not quoted.`}</p>
       </div>
       {wallet && <Wallet session={session} setSession={setSession} request={request} onClose={() => setWallet(false)} records={snap.records} ledger={snap.ledger} />}
@@ -323,49 +319,5 @@ function Wallet({ session, setSession, request, onClose, records, ledger }: { se
         {err && <p className="note" style={{ color: 'var(--red)' }}>{err}</p>}
       </div>
     </>
-  );
-}
-
-function Stress({ send, snap, safeDepth }: { send: (cmd: object) => void; snap: Snapshot; safeDepth: number }) {
-  const [depth, setDepth] = useState(1);
-  const [price, setPrice] = useState('100');
-  const [qty, setQty] = useState('1');
-  const [side, setSide] = useState(0);
-  const dangerous = depth > safeDepth;
-  return (
-    <div>
-      <div className="toolbar" style={{ marginTop: 0 }}>
-        <b>Ethereum transaction</b>
-        <select value={side} onChange={(e) => setSide(Number(e.target.value))} style={{ background: 'var(--bg)', color: 'var(--ink)', border: '1px solid var(--rule2)', padding: '5px 8px', font: 'inherit' }}><option value={0}>Buy</option><option value={1}>Sell</option></select>
-        <input value={price} onChange={(e) => setPrice(e.target.value)} /><input value={qty} onChange={(e) => setQty(e.target.value)} />
-        <button className="btn line" onClick={() => send({ type: 'place', path: 'l1', side, price, qty })}>Submit via Mirror.sendMessage</button>
-        <span>Pays gas; must be mined before execution; no pre-confirmation exists on this path.</span>
-      </div>
-      <div className="toolbar">
-        <b>Forced reorganisation</b>
-        <input type="number" min={1} max={50} value={depth} onChange={(e) => setDepth(Number(e.target.value))} /><span>blocks</span>
-        <button className={`btn ${dangerous ? 'red' : 'line'}`} onClick={() => send({ type: 'reorg', depth })}>Execute</button>
-        {dangerous ? <span className="tag red">{`Deeper than the validator anchor (${safeDepth}); commitments will halt`}</span> : <span className="tag mint">{`Within the validator anchor (${safeDepth}); expected to be absorbed`}</span>}
-      </div>
-      <h2 style={{ marginTop: 16 }}>Program state, two sources <span className="r">highlighted rows exist in one view only</span></h2>
-      <div className="grid2" style={{ marginTop: 0 }}>
-        <Book title="Validator · pre-confirmed" view={snap.preconf} other={snap.committed} />
-        <Book title="Ethereum · settled" view={snap.committed} other={snap.preconf} />
-      </div>
-    </div>
-  );
-}
-
-function Book({ title, view, other }: { title: string; view: BookView; other: BookView }) {
-  const keys = new Set([...other.bids, ...other.asks].map((o) => `${o.id}:${o.qty}`));
-  const rows = (orders: Order[], color: string) => orders.length === 0 ? <tr><td className="dim" colSpan={3}>empty</td></tr> : orders.slice(0, 6).map((o) => <tr key={o.id} className={keys.has(`${o.id}:${o.qty}`) ? '' : 'mine'}><td className="mono" style={{ color }}>#{o.id}</td><td className="r mono" style={{ color }}>{o.price}</td><td className="r mono">{o.qty}</td></tr>);
-  return (
-    <div>
-      <div className="dim2" style={{ marginBottom: 6 }}>{`${title} · event sequence ${view.seq}`}</div>
-      <div className="grid2" style={{ gap: 12, marginTop: 0 }}>
-        <table><thead><tr><th>Bid</th><th className="r">Price</th><th className="r">Qty</th></tr></thead><tbody>{rows(view.bids, 'var(--mint)')}</tbody></table>
-        <table><thead><tr><th>Ask</th><th className="r">Price</th><th className="r">Qty</th></tr></thead><tbody>{rows(view.asks, 'var(--red)')}</tbody></table>
-      </div>
-    </div>
   );
 }
