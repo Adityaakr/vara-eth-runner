@@ -9,7 +9,7 @@ const short = (h?: string) => (h ? `${h.slice(0, 10)}…${h.slice(-6)}` : '');
 const clock = (t: number) => new Date(t).toLocaleTimeString(undefined, { hour12: false }) + '.' + String(t % 1000).padStart(3, '0');
 const preconfOf = (r: WriteRecord) => (r.tPreconf !== undefined ? r.tPreconf - r.tSubmit : undefined);
 const n = (x: number) => x.toLocaleString();
-const uptime = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`);
+const uptime = (s: number) => (s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s` : `${Math.floor(s / 3600)}h${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`);
 type Req = <T>(cmd: object, replyType: string) => Promise<T>;
 
 export default function App() {
@@ -51,36 +51,30 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
         {snap.validator.recycling && <div className="alert" style={{ borderColor: 'var(--mint)', background: 'color-mix(in srgb, var(--mint) 8%, transparent)' }}>Recycling the dev validator: fresh node and Anvil, program redeployed. The single dev node persists every micro-block to an unpruned store and slows as it grows, so the lab restarts it on a schedule. Traffic resumes in about 20 s.</div>}
         {stuck > 0 && !snap.validator.recycling && <div className="alert">{`${stuck} pre-confirmed transaction${stuck > 1 ? 's have' : ' has'} not settled on Ethereum for over ${STUCK_AFTER_MS / 1000} s. The validator continues to pre-confirm but is no longer committing, the signature of a reorg deeper than its anchor. Restart with run/start-node.sh.`}</div>}
 
-        <div className="stats">
-          <div className="hero">
-            <div className="v">{ms0(pre?.p50)}<u>ms</u></div>
-            <div className="k">Pre-confirmation · median</div>
-            <div className="s">{pre ? `submission → validator-signed result · n = ${n(pre.count)} · network: ${snap.network.profile === 'local' ? 'loopback' : `${(snap.network.oneWayMs * 2).toFixed(0)} ms round trip emulated`}` : 'awaiting traffic'}</div>
-          </div>
-          <div className="stat"><div className="k">p95</div><div className="v">{ms0(pre?.p95)}<u>ms</u></div><div className="s">{pre ? `max ${ms0(pre.max)} ms` : ''}</div></div>
-          <div className="stat"><div className="k">Fastest</div><div className="v mint">{ms0(snap.totals.allTimeMinMs, 1)}<u>ms</u></div><div className="s">since start</div></div>
-          <div className="stat"><div className="k">Throughput</div><div className="v">{n(snap.throughput.lastSecond)}<u>tx/s</u></div><div className="s">{`peak ${n(snap.throughput.peak)} · 3 min`}</div></div>
-          <div className="stat"><div className="k">Transactions</div><div className="v">{n(snap.totals.txs)}</div><div className="s">{`${snap.totals.failed} failed`}</div></div>
-          <div className="stat"><div className="k">Validator uptime</div><div className="v">{snap.validator.recycling ? '…' : uptime(snap.validator.uptimeSec)}</div><div className="s">{snap.validator.recycling ? 'recycling the dev node' : `recycled ${snap.validator.recycles}× · every ${snap.validator.recycleEveryMin} min or on creep`}</div></div>
+        <Band series={snap.throughput.series} network={snap.network} />
+
+        <div className="tiles">
+          <div className="tile"><div className="k">Latest height</div><div className="v">{snap.ethHead}</div></div>
+          <div className="tile"><div className="k">Median pre-confirm</div><div className="v mint">{ms0(pre?.p50)}<u>ms</u></div><div className="s">{pre ? `n ${n(pre.count)}` : '—'}</div></div>
+          <div className="tile"><div className="k">P95</div><div className="v">{ms0(pre?.p95)}<u>ms</u></div><div className="s">{pre ? `max ${ms0(pre.max)}` : '—'}</div></div>
+          <div className="tile"><div className="k">Fastest</div><div className="v mint">{ms0(snap.totals.allTimeMinMs, 1)}<u>ms</u></div><div className="s">since start</div></div>
+          <div className="tile"><div className="k">Pre-confirmed tx/sec</div><div className="v">{n(snap.throughput.lastSecond)}</div><div className="s">{`peak ${n(snap.throughput.peak)}`}</div></div>
+          <div className="tile"><div className="k">Total txs</div><div className="v">{n(snap.totals.txs)}</div><div className="s">{`${snap.totals.failed} failed`}</div></div>
+          <div className="tile"><div className="k">Validator uptime</div><div className="v">{snap.validator.recycling ? '…' : uptime(snap.validator.uptimeSec)}</div><div className="s">{snap.validator.recycling ? 'recycling' : `${snap.validator.recycles} recycles`}</div></div>
         </div>
 
         <Toolbar send={send} snap={snap} />
 
         <div className="grid">
           <div className="panel">
-            <h2>Throughput and latency <span className="r">last 180 s · one-second resolution</span></h2>
-            <Chart series={snap.throughput.series} />
-            <p className="note">Bars: transactions pre-confirmed per second. Line: median pre-confirmation latency in that second, right-hand scale. Measured from submission to receipt of the validator-signed result on one clock; signing excluded. The network emulator delays every frame to and from the validator by a one-way latency calibrated against a live Gear endpoint, so the figures reflect a hosted validator rather than a loopback.</p>
+            <h2>Transactions <span className="r">{`newest first · ${n(snap.totals.preconfirmed)} pre-confirmed`}</span></h2>
+            <TxTable records={snap.records} mine={session?.address} />
           </div>
           <div className="panel">
-            <h2>Latency distribution <span className="r">recent pre-confirmations</span></h2>
+            <h2>Latency distribution <span className="r">recent</span></h2>
             <Histogram bins={snap.latency.histogram} />
+            <p className="note" style={{ marginTop: 14 }}>Pre-confirmation latency is measured from submission to the validator-signed result on one clock; signing excluded. Frames to and from the validator are delayed by a one-way latency calibrated live against a Gear endpoint, so figures reflect a hosted validator, not loopback.</p>
           </div>
-        </div>
-
-        <div className="panel" style={{ marginTop: 14 }}>
-          <h2>Transactions <span className="r">{`newest first · ${n(snap.totals.preconfirmed)} pre-confirmed`}</span></h2>
-          <TxTable records={snap.records} mine={session?.address} />
         </div>
 
         <div className="grid2">
@@ -118,43 +112,46 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
   );
 }
 
-function Chart({ series }: { series: Snapshot['throughput']['series'] }) {
+function Band({ series, network }: { series: Snapshot['throughput']['series']; network: Snapshot['network'] }) {
   const w = 1000;
-  const h = 170;
-  const pad = 6;
+  const h = 100;
   const maxTps = Math.max(10, ...series.map((b) => b.preconf));
-  // Robust latency scale: 1.25 × the 90th percentile of the window's medians, capped, so one outlier
-  // second cannot flatten the whole line.
   const meds = series.map((b) => b.p50).filter((x): x is number => x !== null).sort((a, b) => a - b);
   const p90 = meds.length ? meds[Math.min(meds.length - 1, Math.floor(meds.length * 0.9))] : 20;
   const maxMs = Math.min(800, Math.max(25, p90 * 1.25));
   const bw = w / series.length;
-  const pts = series.map((b, i) => (b.p50 === null ? null : { x: i * bw + bw / 2, y: h - pad - (Math.min(b.p50, maxMs) / maxMs) * (h - 2 * pad) }));
+  const pts = series.map((b, i) => (b.p50 === null ? null : { x: i * bw + bw / 2, y: h - 4 - (Math.min(b.p50, maxMs) / maxMs) * (h - 12) }));
   const segs: string[] = [];
   let cur: { x: number; y: number }[] = [];
-  const flush = () => {
-    if (cur.length === 1) segs.push(`M${cur[0].x.toFixed(1)},${cur[0].y.toFixed(1)} h${(bw / 2).toFixed(1)}`);
-    else if (cur.length > 1) segs.push(smooth(cur));
-    cur = [];
-  };
+  const flush = () => { if (cur.length > 1) segs.push(smooth(cur)); cur = []; };
   for (const p of pts) { if (p) cur.push(p); else flush(); }
   flush();
   return (
-    <div className="chart">
+    <div className="band">
+      <div className="band-head">
+        <span>Pre-confirmed transactions per second · last 3 min</span>
+        <span className="mid">median latency, {maxMs.toFixed(0)} ms full scale</span>
+        <span className="net">{network.profile === 'local' ? 'loopback' : `${(network.oneWayMs * 2).toFixed(0)} ms round trip emulated · calibrated against ${network.calibration.target}`}</span>
+      </div>
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
         <defs>
-          <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#00ffc4" stopOpacity="0.95" /><stop offset="1" stopColor="#00ffc4" stopOpacity="0.12" /></linearGradient>
-          <filter id="glow" x="-5%" y="-40%" width="110%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          <linearGradient id="bandfill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#00ffc4" stopOpacity="1" />
+            <stop offset="0.18" stopColor="#00ffc4" stopOpacity="0.85" />
+            <stop offset="0.18" stopColor="#00e0ac" stopOpacity="0.62" />
+            <stop offset="0.38" stopColor="#00e0ac" stopOpacity="0.62" />
+            <stop offset="0.38" stopColor="#00b58a" stopOpacity="0.42" />
+            <stop offset="0.6" stopColor="#00b58a" stopOpacity="0.42" />
+            <stop offset="0.6" stopColor="#0a7a5e" stopOpacity="0.3" />
+            <stop offset="0.82" stopColor="#0a7a5e" stopOpacity="0.3" />
+            <stop offset="0.82" stopColor="#0d4a3b" stopOpacity="0.28" />
+            <stop offset="1" stopColor="#0d4a3b" stopOpacity="0.28" />
+          </linearGradient>
         </defs>
-        {[0.25, 0.5, 0.75].map((f) => <line key={f} x1={0} x2={w} y1={h * f} y2={h * f} stroke="#26254a" strokeWidth="1" vectorEffect="non-scaling-stroke" />)}
-        {series.map((b, i) => {
-          const bh = (b.preconf / maxTps) * (h - pad);
-          return <rect key={b.t} x={i * bw + 0.6} y={h - bh} width={Math.max(0.8, bw - 1.2)} height={bh} fill="url(#bar)" />;
-        })}
-        {segs.map((d, i) => <path key={i} d={d} fill="none" stroke="#8ec2ff" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" filter="url(#glow)" />)}
+        {series.map((b, i) => { const bh = Math.max(1.5, (b.preconf / maxTps) * h); return <rect key={b.t} x={i * bw} y={h - bh} width={Math.max(0.8, bw - 0.7)} height={bh} fill="url(#bandfill)" />; })}
+        {segs.map((d, i) => <path key={i} d={d} fill="none" stroke="#8ec2ff" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinecap="round" opacity="0.9" />)}
       </svg>
-      <span className="lbl tl">{`${maxTps} tx/s`}</span>
-      <span className="lbl tr">{`${maxMs.toFixed(0)} ms`}</span>
+      <div className="band-foot"><span>{`${maxTps} tx/s`}</span><span className="mid">{`${maxMs.toFixed(0)} ms`}</span></div>
     </div>
   );
 }
