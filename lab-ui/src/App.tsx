@@ -47,8 +47,8 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
       </div>
       <div className="page">
         {lastError && <div className="alert">Command rejected · {lastError}</div>}
-        {snap.preconfError && <div className="alert">The validator is not answering state queries · {snap.preconfError.slice(0, 120)}</div>}
-        {snap.validator.recycling && <div className="alert" style={{ borderColor: 'var(--mint)', background: 'color-mix(in srgb, var(--mint) 8%, transparent)' }}>Recycling the dev validator: fresh node and Anvil, program redeployed. The single dev node persists every micro-block to an unpruned store and slows as it grows, so the lab restarts it on a schedule. Traffic resumes in about 20 s.</div>}
+        {snap.preconfError && !snap.validator.recycling && <div className="alert">The validator is not answering state queries · {snap.preconfError}</div>}
+        {snap.validator.recycling && <div className="alert" style={{ borderColor: 'var(--mint)', background: 'color-mix(in srgb, var(--mint) 8%, transparent)' }}>Recycling the validator. Traffic resumes in about 20 s.</div>}
         {stuck > 0 && !snap.validator.recycling && <div className="alert">{`${stuck} pre-confirmed transaction${stuck > 1 ? 's have' : ' has'} not settled on Ethereum for over ${STUCK_AFTER_MS / 1000} s. The validator continues to pre-confirm but is no longer committing, the signature of a reorg deeper than its anchor. Restart with run/start-node.sh.`}</div>}
 
         <Band series={snap.throughput.series} />

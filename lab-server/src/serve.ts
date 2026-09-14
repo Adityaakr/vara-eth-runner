@@ -193,12 +193,14 @@ async function main() {
   const snapshot = async () => {
     // The book query is a dry-run execution on the validator; during a blast it would compete with
     // the transactions being measured, so the last known book is shown instead.
-    if (!blastState.running) {
+    if (validator.recycling) {
+      preconfError = null; // the old connection is gone by design; not a validator fault
+    } else if (!blastState.running) {
       try {
         lastPreconf = await engine.preconfBook();
         preconfError = null;
       } catch (err) {
-        preconfError = String(err);
+        preconfError = shortErr(err);
       }
     }
     const now = Date.now();
@@ -218,7 +220,7 @@ async function main() {
         mirror: chain.mirrorAddress,
         sender: chain.sender.address,
         node: nodeSettings(),
-        ethHead: await chain.publicClient.getBlockNumber(),
+        ethHead: await chain.publicClient.getBlockNumber().catch(() => 0n),
         preconf: lastPreconf,
         preconfError,
         committed: engine.committedBook(),
@@ -237,7 +239,7 @@ async function main() {
         network: { profile: netem.profile.name, oneWayMs: netem.profile.oneWayMs, jitterMs: netem.profile.jitterMs, note: netem.profile.note, calibration: cal, profiles: Object.values(table).map((p) => ({ name: p.name, oneWayMs: p.oneWayMs, note: p.note })) },
         latency: { preconf: preconfLat, e2e, histogram },
         throughput: { series, lastSecond: lastSecond.preconf, peak: Math.max(...series.map((b) => b.preconf)) },
-        blocks: await blockRows(),
+        blocks: await blockRows().catch(() => []),
         records: records.slice(-40).map((r) => ({ ...r, wallPreconf: wallOf(r, r.tPreconf), wallCommitted: wallOf(r, r.tCommitted) })),
         stats: { injected: statsFor(records, 'injected'), l1: statsFor(records, 'l1') },
         blast: blastState,
@@ -374,6 +376,11 @@ function tsxBin(): string {
 function reviveRecord(raw: Record<string, unknown>): WriteRecord {
   const big = (k: string) => (typeof raw[k] === 'string' ? BigInt(raw[k] as string) : undefined);
   return { ...(raw as unknown as WriteRecord), orderId: big('orderId'), ethBlock: big('ethBlock'), committedBlock: undefined, tCommitted: undefined };
+}
+
+function shortErr(err: unknown): string {
+  const e = err as { shortMessage?: string; message?: string };
+  return (e?.shortMessage ?? e?.message ?? String(err)).split('\n')[0].slice(0, 140);
 }
 
 function safeSend(ws: WebSocket, msg: string): void {
