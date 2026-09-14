@@ -112,44 +112,64 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
 
 function Band({ series, network }: { series: Snapshot['throughput']['series']; network: Snapshot['network'] }) {
   const w = 1000;
-  const h = 100;
-  const maxTps = Math.max(10, ...series.map((b) => b.preconf));
+  const h = 120;
+  const top = 8;
+  const tps = series.map((b) => b.preconf);
+  const sortedTps = [...tps].sort((a, b) => a - b);
+  // Scale to the steady traffic (95th percentile), so bars fill the band; surges clip at the top.
+  const p95Tps = sortedTps[Math.floor(sortedTps.length * 0.95)] ?? 0;
+  const maxTps = Math.max(8, p95Tps * 1.15);
+  const peak = Math.max(...tps, 0);
   const meds = series.map((b) => b.p50).filter((x): x is number => x !== null).sort((a, b) => a - b);
   const p90 = meds.length ? meds[Math.min(meds.length - 1, Math.floor(meds.length * 0.9))] : 20;
   const maxMs = Math.min(800, Math.max(25, p90 * 1.25));
   const bw = w / series.length;
-  const pts = series.map((b, i) => (b.p50 === null ? null : { x: i * bw + bw / 2, y: h - 4 - (Math.min(b.p50, maxMs) / maxMs) * (h - 12) }));
+  const pts = series.map((b, i) => (b.p50 === null ? null : { x: i * bw + bw / 2, y: top + (1 - Math.min(b.p50, maxMs) / maxMs) * (h - top - 6) }));
   const segs: string[] = [];
   let cur: { x: number; y: number }[] = [];
   const flush = () => { if (cur.length > 1) segs.push(smooth(cur)); cur = []; };
   for (const p of pts) { if (p) cur.push(p); else flush(); }
   flush();
+  const ticks = [0, 0.25, 0.5, 0.75].map((f) => ({ x: f * w, label: `-${Math.round((1 - f) * series.length)}s` }));
   return (
     <div className="band">
       <div className="band-head">
-        <span>Pre-confirmed transactions per second · last 3 min</span>
-        <span className="mid">median latency, {maxMs.toFixed(0)} ms full scale</span>
-        <span className="net">{network.profile === 'local' ? 'loopback' : `${(network.oneWayMs * 2).toFixed(0)} ms round trip emulated · calibrated against ${network.calibration.target}`}</span>
+        <span><i className="dot mint" />Pre-confirmed transactions per second</span>
+        <span><i className="dot blue" />Median pre-confirmation latency</span>
+        <span className="net">{network.profile === 'local' ? 'Loopback, no wire emulation' : `${(network.oneWayMs * 2).toFixed(0)} ms round trip emulated · calibrated live against ${network.calibration.target}`}</span>
       </div>
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="bandfill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#00ffc4" stopOpacity="1" />
-            <stop offset="0.18" stopColor="#00ffc4" stopOpacity="0.85" />
-            <stop offset="0.18" stopColor="#00e0ac" stopOpacity="0.62" />
-            <stop offset="0.38" stopColor="#00e0ac" stopOpacity="0.62" />
-            <stop offset="0.38" stopColor="#00b58a" stopOpacity="0.42" />
-            <stop offset="0.6" stopColor="#00b58a" stopOpacity="0.42" />
-            <stop offset="0.6" stopColor="#0a7a5e" stopOpacity="0.3" />
-            <stop offset="0.82" stopColor="#0a7a5e" stopOpacity="0.3" />
-            <stop offset="0.82" stopColor="#0d4a3b" stopOpacity="0.28" />
-            <stop offset="1" stopColor="#0d4a3b" stopOpacity="0.28" />
-          </linearGradient>
-        </defs>
-        {series.map((b, i) => { const bh = Math.max(1.5, (b.preconf / maxTps) * h); return <rect key={b.t} x={i * bw} y={h - bh} width={Math.max(0.8, bw - 0.7)} height={bh} fill="url(#bandfill)" />; })}
-        {segs.map((d, i) => <path key={i} d={d} fill="none" stroke="#8ec2ff" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinecap="round" opacity="0.9" />)}
-      </svg>
-      <div className="band-foot"><span>{`${maxTps} tx/s`}</span><span className="mid">{`${maxMs.toFixed(0)} ms`}</span></div>
+      <div className="band-plot">
+        <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="bandfill" gradientUnits="userSpaceOnUse" x1="0" y1={top} x2="0" y2={h}>
+              <stop offset="0" stopColor="#5fffd9" />
+              <stop offset="0.14" stopColor="#5fffd9" />
+              <stop offset="0.14" stopColor="#00ffc4" />
+              <stop offset="0.34" stopColor="#00ffc4" />
+              <stop offset="0.34" stopColor="#00d4a3" />
+              <stop offset="0.54" stopColor="#00d4a3" />
+              <stop offset="0.54" stopColor="#0aa583" />
+              <stop offset="0.74" stopColor="#0aa583" />
+              <stop offset="0.74" stopColor="#0f7a63" />
+              <stop offset="0.9" stopColor="#0f7a63" />
+              <stop offset="0.9" stopColor="#12584a" />
+              <stop offset="1" stopColor="#12584a" />
+            </linearGradient>
+            <linearGradient id="bandglow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#00ffc4" stopOpacity="0.10" /><stop offset="1" stopColor="#00ffc4" stopOpacity="0" /></linearGradient>
+            <filter id="lineglow" x="-5%" y="-40%" width="110%" height="180%"><feGaussianBlur stdDeviation="3" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          </defs>
+          <rect x="0" y="0" width={w} height={h} fill="url(#bandglow)" />
+          {[0.25, 0.5, 0.75].map((f) => <line key={f} x1={0} x2={w} y1={top + (h - top) * f} y2={top + (h - top) * f} stroke="#26254a" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray="2 4" />)}
+          {series.map((b, i) => { const bh = Math.max(1.2, Math.min(1, b.preconf / maxTps) * (h - top)); return <rect key={b.t} x={i * bw} y={h - bh} width={Math.max(0.8, bw - 0.9)} height={bh} rx="0.6" fill="url(#bandfill)" />; })}
+          {segs.map((d, i) => <path key={i} d={d} fill="none" stroke="#9cc8ff" strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinecap="round" filter="url(#lineglow)" />)}
+          <line x1={0} x2={w} y1={h} y2={h} stroke="#34335c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        </svg>
+        <span className="ax tl">{`${maxTps.toFixed(0)} tx/s`}</span>
+        <span className="ax tr">{`${maxMs.toFixed(0)} ms`}</span>
+        {ticks.map((t) => <span key={t.x} className="ax tick" style={{ left: `${(t.x / w) * 100}%` }}>{t.label}</span>)}
+        <span className="ax tick" style={{ right: 0 }}>now</span>
+      </div>
+      <div className="band-foot"><span>{`peak ${peak} tx/s in the window`}</span><span className="mid">{`latency scale ${maxMs.toFixed(0)} ms`}</span><span className="net">{`${series.length} s · one-second resolution`}</span></div>
     </div>
   );
 }
