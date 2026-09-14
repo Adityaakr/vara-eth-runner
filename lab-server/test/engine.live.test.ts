@@ -1,6 +1,7 @@
 // Live test against the running local stack (run/start-node.sh + run/deploy.sh).
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { connectChain, type Chain } from '../src/chain.js';
+import { quietMirrorAddress } from '../src/config.js';
 import { LabEngine } from '../src/engine.js';
 import { SIDE_ASK, SIDE_BID } from '../src/sails.js';
 
@@ -8,7 +9,7 @@ let chain: Chain;
 let engine: LabEngine;
 
 beforeAll(async () => {
-  chain = await connectChain(0);
+  chain = await connectChain(0, quietMirrorAddress());
   engine = await LabEngine.create(chain);
 });
 afterAll(async () => {

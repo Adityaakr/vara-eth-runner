@@ -132,7 +132,8 @@ async function main() {
     }
     if (rate <= 0) return;
     const mirrorsFile = resolve(LAB_ROOT, 'run/mirrors.txt');
-    const mirrors = existsSync(mirrorsFile) ? readFileSync(mirrorsFile, 'utf8').split('\n').filter(Boolean).join(',') : '';
+    // Traffic uses at most the first 4 instances; a 5th, if deployed, stays quiet for the live tests.
+    const mirrors = existsSync(mirrorsFile) ? readFileSync(mirrorsFile, 'utf8').split('\n').filter(Boolean).slice(0, 4).join(',') : '';
     const child = spawn(process.execPath, [tsxBin(), resolve(dirname(fileURLToPath(import.meta.url)), 'traffic-cli.ts'), String(rate), String(BLAST_SENDERS)], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, LAB_MIRRORS: mirrors } });
     child.stderr.on('data', (d) => process.stderr.write(`[traffic] ${d}`));
     createInterface({ input: child.stdout }).on('line', (line) => {

@@ -57,3 +57,14 @@ export function nodeSettings(): NodeSettings {
     return { quarantine: 0, blockTime: 1, startedAt: '' };
   }
 }
+
+/** A program instance the autopilot does not touch (the 5th in run/mirrors.txt), for live tests. */
+export function quietMirrorAddress(): Address {
+  try {
+    const lines = readFileSync(resolve(LAB_ROOT, 'run', 'mirrors.txt'), 'utf8').split('\n').filter(Boolean);
+    if (lines.length >= 5) return lines[4] as Address;
+  } catch {
+    /* fall through */
+  }
+  return mirrorAddress();
+}

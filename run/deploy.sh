@@ -8,7 +8,7 @@ WASM="$LAB/orderbook/target/wasm32-gear/release/orderbook.opt.wasm"
 ROUTER="$(cat "$LAB/run/router.addr")"
 SENDER="${SENDER:-0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc}"   # Anvil #2 = ethexe dev "Sender #1"
 EXEC_BALANCE="${EXEC_BALANCE:-1000000000000000}"               # raw WVARA units (12 decimals => 1000 WVARA)
-INSTANCES="${INSTANCES:-4}"                                    # program instances to create from the same code
+INSTANCES="${INSTANCES:-5}"                                    # instances: traffic uses the first 4, live tests the 5th
 TX="$ETHEXE --cfg none tx --ethereum-rpc ws://127.0.0.1:8545 --ethereum-router $ROUTER --sender $SENDER"
 echo "uploading $WASM as $SENDER via router $ROUTER"
 UP=$($TX upload "$WASM" --watch --json)
