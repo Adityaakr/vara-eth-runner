@@ -133,30 +133,40 @@ function Band({ series, network, latency }: { series: Snapshot['throughput']['se
 }
 
 function Toolbar({ send, snap }: { send: (cmd: object) => void; snap: Snapshot }) {
-  const [rate, setRate] = useState(String(snap.autopilot.rate || 60));
+  const [rate, setRate] = useState(String(snap.autopilot.rate || 12));
   const [burst, setBurst] = useState('1000');
   const [conc, setConc] = useState('64');
   const last = snap.blast.last;
   return (
     <div className="toolbar">
-      <b>Network</b>
-      <select value={snap.network.profile} onChange={(e) => send({ type: 'network', profile: e.target.value })} style={{ background: 'var(--bg)', color: 'var(--ink)', border: '1px solid var(--rule2)', padding: '5px 8px', font: 'inherit' }}>
-        {snap.network.profiles.map((p) => <option key={p.name} value={p.name}>{p.name === 'local' ? 'Loopback (no emulation)' : p.name === 'measured' ? `Measured WAN · ${(p.oneWayMs * 2).toFixed(0)} ms RTT` : `Global · ${(p.oneWayMs * 2).toFixed(0)} ms RTT`}</option>)}
-      </select>
-      <span title={snap.network.note}>{snap.network.calibration.rttMs ? `calibrated live against ${snap.network.calibration.target}` : 'calibration unavailable, default 160 ms'}</span>
-      <span className="sep" />
-      <b>Traffic generator</b>
-      <span className="stat">{snap.autopilot.running ? `${snap.autopilot.rate} tx/s steady, periodic 250-tx surges` : 'paused'}</span>
-      <input value={rate} onChange={(e) => setRate(e.target.value)} />
-      <button className="btn line" onClick={() => send({ type: 'autopilot', rate: Number(rate) })}>Apply rate</button>
-      <button className="btn line" disabled={!snap.autopilot.running} onClick={() => send({ type: 'autopilot', rate: 0 })}>Pause</button>
-      <button className="btn line" disabled={snap.validator.recycling} onClick={() => send({ type: 'recycle' })}>Recycle validator</button>
-      <span className="sep" />
-      <b>Load test</b>
-      <input value={burst} onChange={(e) => setBurst(e.target.value)} /><span>transactions</span>
-      <input value={conc} onChange={(e) => setConc(e.target.value)} /><span>in flight</span>
-      <button className="btn" disabled={snap.blast.running} onClick={() => send({ type: 'blast', total: Number(burst), concurrency: Number(conc) })}>{snap.blast.running ? 'Running…' : 'Run'}</button>
-      {last && !snap.blast.running && <span className="stat">{`Last run: ${n(last.ok)} / ${n(last.total)} in ${(last.wallMs / 1000).toFixed(2)} s · ${last.preconfPerSec.toFixed(0)} tx/s sustained`}</span>}
+      <div className="group">
+        <div className="lbl">Network</div>
+        <div className="row">
+          <select value={snap.network.profile} onChange={(e) => send({ type: 'network', profile: e.target.value })}>
+            {snap.network.profiles.map((p) => <option key={p.name} value={p.name}>{p.name === 'local' ? 'Loopback' : p.name === 'measured' ? `Measured · ${(p.oneWayMs * 2).toFixed(0)} ms RTT` : `Global · ${(p.oneWayMs * 2).toFixed(0)} ms RTT`}</option>)}
+          </select>
+          <span className="cap" title={snap.network.note}>{snap.network.calibration.rttMs ? `live: ${snap.network.calibration.target}` : 'default 160 ms'}</span>
+        </div>
+      </div>
+      <div className="group">
+        <div className="lbl">Traffic</div>
+        <div className="row">
+          <input value={rate} onChange={(e) => setRate(e.target.value)} /><span className="cap">tx/s</span>
+          <button className="btn line" onClick={() => send({ type: 'autopilot', rate: Number(rate) })}>Apply</button>
+          <button className="btn line" disabled={!snap.autopilot.running} onClick={() => send({ type: 'autopilot', rate: 0 })}>Pause</button>
+          <button className="btn line" disabled={snap.validator.recycling} onClick={() => send({ type: 'recycle' })}>{snap.validator.recycling ? 'Recycling…' : 'Recycle'}</button>
+          <span className="cap">{snap.autopilot.running ? `${snap.autopilot.rate} tx/s · surges` : 'paused'}</span>
+        </div>
+      </div>
+      <div className="group">
+        <div className="lbl">Load test</div>
+        <div className="row">
+          <input value={burst} onChange={(e) => setBurst(e.target.value)} /><span className="cap">txs</span>
+          <input value={conc} onChange={(e) => setConc(e.target.value)} /><span className="cap">in flight</span>
+          <button className="btn" disabled={snap.blast.running} onClick={() => send({ type: 'blast', total: Number(burst), concurrency: Number(conc) })}>{snap.blast.running ? 'Running…' : 'Run'}</button>
+          {last && !snap.blast.running && <span className="cap">{`${last.preconfPerSec.toFixed(0)} tx/s · ${n(last.ok)}/${n(last.total)}`}</span>}
+        </div>
+      </div>
     </div>
   );
 }
