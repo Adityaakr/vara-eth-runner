@@ -9,7 +9,6 @@ const short = (h?: string) => (h ? `${h.slice(0, 10)}…${h.slice(-6)}` : '');
 const clock = (t: number) => new Date(t).toLocaleTimeString(undefined, { hour12: false }) + '.' + String(t % 1000).padStart(3, '0');
 const preconfOf = (r: WriteRecord) => (r.tPreconf !== undefined ? r.tPreconf - r.tSubmit : undefined);
 const n = (x: number) => x.toLocaleString();
-const uptime = (s: number) => (s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s` : `${Math.floor(s / 3600)}h${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`);
 type Req = <T>(cmd: object, replyType: string) => Promise<T>;
 
 export default function App() {
@@ -60,7 +59,6 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
           <div className="tile"><div className="k">Fastest</div><div className="v mint">{ms0(snap.totals.allTimeMinMs, 1)}<u>ms</u></div><div className="s">since start</div></div>
           <div className="tile"><div className="k">Pre-confirmed tx/sec</div><div className="v">{n(snap.throughput.lastSecond)}</div><div className="s">{`peak ${n(snap.throughput.peak)}`}</div></div>
           <div className="tile"><div className="k">Total txs</div><div className="v">{n(snap.totals.txs)}</div><div className="s">{`${snap.totals.failed} failed`}</div></div>
-          <div className="tile"><div className="k">Validator uptime</div><div className="v">{snap.validator.recycling ? '…' : uptime(snap.validator.uptimeSec)}</div><div className="s">{snap.validator.recycling ? 'recycling' : `${snap.validator.recycles} recycles`}</div></div>
         </div>
 
         <Toolbar send={send} snap={snap} />
