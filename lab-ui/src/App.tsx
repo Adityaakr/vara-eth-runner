@@ -39,8 +39,6 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
       <div className="mast">
         <div className="mark"><img src="/vara-eth-logo.svg" alt="Vara.eth" />VARA.ETH <span>Pre-confirmation telemetry</span></div>
         <div className="meta">
-          <span className={`chip ${live ? '' : 'off'}`}><i />{live ? 'Validator live' : 'Degraded'}</span>
-          <span className="mono">{`Ethereum block ${snap.ethHead}`}</span>
           <button className="btn line" onClick={() => setControls(true)}>Controls</button>
           <button className="btn" onClick={() => setWallet(true)}>{session ? `Wallet · ${session.address.slice(0, 6)}…${session.address.slice(-4)}` : 'Wallet'}</button>
         </div>
