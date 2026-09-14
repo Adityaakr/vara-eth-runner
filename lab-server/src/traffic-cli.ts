@@ -11,8 +11,8 @@ import { SIDE_ASK, SIDE_BID } from './sails.js';
 
 const rate = Math.max(1, Number(process.argv[2] ?? 20));
 const senders = Math.max(1, Number(process.argv[3] ?? 4));
-const burstEverySec = Math.max(0, Number(process.argv[4] ?? 75));
-const burstSize = Math.max(0, Number(process.argv[5] ?? 250));
+const burstEverySec = Math.max(0, Number(process.argv[4] ?? 90));
+const burstSize = Math.max(0, Number(process.argv[5] ?? 120));
 
 async function main() {
   const mirrors = (process.env.LAB_MIRRORS ?? '').split(',').filter(Boolean) as `0x${string}`[];
@@ -55,7 +55,7 @@ async function main() {
       let left = burstSize;
       let burstInFlight = 0;
       const pump = () => {
-        while (left > 0 && burstInFlight < 24) {
+        while (left > 0 && burstInFlight < 12) {
           left--;
           burstInFlight++;
           const idx = i % engines.length;

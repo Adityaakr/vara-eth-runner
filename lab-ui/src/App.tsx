@@ -9,6 +9,7 @@ const short = (h?: string) => (h ? `${h.slice(0, 10)}…${h.slice(-6)}` : '');
 const clock = (t: number) => new Date(t).toLocaleTimeString(undefined, { hour12: false }) + '.' + String(t % 1000).padStart(3, '0');
 const preconfOf = (r: WriteRecord) => (r.tPreconf !== undefined ? r.tPreconf - r.tSubmit : undefined);
 const n = (x: number) => x.toLocaleString();
+const uptime = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`);
 type Req = <T>(cmd: object, replyType: string) => Promise<T>;
 
 export default function App() {
@@ -47,7 +48,8 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
       <div className="page">
         {lastError && <div className="alert">Command rejected · {lastError}</div>}
         {snap.preconfError && <div className="alert">The validator is not answering state queries · {snap.preconfError.slice(0, 120)}</div>}
-        {stuck > 0 && <div className="alert">{`${stuck} pre-confirmed transaction${stuck > 1 ? 's have' : ' has'} not settled on Ethereum for over ${STUCK_AFTER_MS / 1000} s. The validator continues to pre-confirm but is no longer committing, the signature of a reorg deeper than its anchor. Restart with run/start-node.sh.`}</div>}
+        {snap.validator.recycling && <div className="alert" style={{ borderColor: 'var(--mint)', background: 'color-mix(in srgb, var(--mint) 8%, transparent)' }}>Recycling the dev validator: fresh node and Anvil, program redeployed. The single dev node persists every micro-block to an unpruned store and slows as it grows, so the lab restarts it on a schedule. Traffic resumes in about 20 s.</div>}
+        {stuck > 0 && !snap.validator.recycling && <div className="alert">{`${stuck} pre-confirmed transaction${stuck > 1 ? 's have' : ' has'} not settled on Ethereum for over ${STUCK_AFTER_MS / 1000} s. The validator continues to pre-confirm but is no longer committing, the signature of a reorg deeper than its anchor. Restart with run/start-node.sh.`}</div>}
 
         <div className="stats">
           <div className="hero">
@@ -59,6 +61,7 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
           <div className="stat"><div className="k">Fastest</div><div className="v mint">{ms0(snap.totals.allTimeMinMs, 1)}<u>ms</u></div><div className="s">since start</div></div>
           <div className="stat"><div className="k">Throughput</div><div className="v">{n(snap.throughput.lastSecond)}<u>tx/s</u></div><div className="s">{`peak ${n(snap.throughput.peak)} · 3 min`}</div></div>
           <div className="stat"><div className="k">Transactions</div><div className="v">{n(snap.totals.txs)}</div><div className="s">{`${snap.totals.failed} failed`}</div></div>
+          <div className="stat"><div className="k">Validator uptime</div><div className="v">{snap.validator.recycling ? '…' : uptime(snap.validator.uptimeSec)}</div><div className="s">{snap.validator.recycling ? 'recycling the dev node' : `recycled ${snap.validator.recycles}× · every ${snap.validator.recycleEveryMin} min or on creep`}</div></div>
         </div>
 
         <Toolbar send={send} snap={snap} />
@@ -211,6 +214,7 @@ function Toolbar({ send, snap }: { send: (cmd: object) => void; snap: Snapshot }
       <input value={rate} onChange={(e) => setRate(e.target.value)} />
       <button className="btn line" onClick={() => send({ type: 'autopilot', rate: Number(rate) })}>Apply rate</button>
       <button className="btn line" disabled={!snap.autopilot.running} onClick={() => send({ type: 'autopilot', rate: 0 })}>Pause</button>
+      <button className="btn line" disabled={snap.validator.recycling} onClick={() => send({ type: 'recycle' })}>Recycle validator</button>
       <span className="sep" />
       <b>Load test</b>
       <input value={burst} onChange={(e) => setBurst(e.target.value)} /><span>transactions</span>

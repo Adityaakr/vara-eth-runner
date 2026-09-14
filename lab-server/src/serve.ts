@@ -13,7 +13,7 @@ import { LAB_ROOT, nodeSettings } from './config.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { LabEngine, type PreparedInjected } from './engine.js';
 import type { Hex } from 'viem';
-import { anvilReorg } from './stack.js';
+import { anvilReorg, deployProgramAsync, restartNodeAsync } from './stack.js';
 import { statsFor, summarize, type WriteRecord } from './timeline.js';
 import { NetEmulator, calibrate, profiles, type NetProfile } from './netem.js';
 import { VARA_ETH_RPC_DIRECT } from './config.js';
@@ -22,7 +22,12 @@ const PORT = Number(process.env.LAB_WS_PORT ?? 8787);
 const BLAST_SENDERS = 4;
 const HISTORY_SECONDS = 180;
 const RECENT_MAX = 4000;
-const DEFAULT_AUTOPILOT_RATE = Number(process.env.LAB_AUTOPILOT_RATE ?? 25);
+const DEFAULT_AUTOPILOT_RATE = Number(process.env.LAB_AUTOPILOT_RATE ?? 12);
+/** The dev node persists every micro-block to an unpruned --tmp RocksDB (64 GB in 40 min at 25 tx/s) and slows
+ * as it grows. The server recycles the stack on a timer and whenever the validator's own execution latency
+ * (measured minus emulated wire) creeps, and says so on the page. */
+const RECYCLE_EVERY_MIN = Number(process.env.LAB_RECYCLE_MINUTES ?? 10);
+const RECYCLE_IF_VALIDATOR_MS = Number(process.env.LAB_RECYCLE_VALIDATOR_MS ?? 60);
 const NETEM_PORT = Number(process.env.LAB_NETEM_PORT ?? 9945);
 const CALIBRATION_URL = process.env.LAB_CALIBRATE_URL ?? 'wss://rpc.vara.network';
 const DEFAULT_NET_PROFILE = (process.env.LAB_NET_PROFILE ?? 'measured') as NetProfile['name'];
@@ -33,6 +38,7 @@ type Command =
   | { type: 'blast'; total: number; concurrency: number }
   | { type: 'autopilot'; rate: number }
   | { type: 'network'; profile: NetProfile['name'] }
+  | { type: 'recycle' }
   | { type: 'prepare'; side: number; price: string; qty: string }
   | { type: 'submitSigned'; prepId: string; signature: string; address: string };
 
@@ -51,9 +57,10 @@ async function main() {
   netem.listen(NETEM_PORT);
   process.env.VARA_ETH_RPC_WS = `ws://127.0.0.1:${NETEM_PORT}`;
   console.log(`network emulation: ${netem.profile.name} (${netem.profile.note}); one-way ${netem.profile.oneWayMs.toFixed(0)} ms`);
-  const chain = await connectChain(4);
-  const engine = await LabEngine.create(chain);
+  let chain = await connectChain(4);
+  let engine = await LabEngine.create(chain);
   await engine.start();
+  const validator = { startedAt: Date.now(), recycles: 0, lastRecycleAt: null as number | null, recycling: false, lastReason: '' };
   // Blast records come from a child process (see runBlast) so signing and RPC traffic never share
   // this server's event loop with snapshot serialization; committed attribution still happens here.
   // Records from child processes (autopilot traffic and bursts) live in one bounded ring so the
@@ -73,6 +80,43 @@ async function main() {
     }
   };
   engine.trackRecords(recent);
+
+  const recycle = async (reason: string) => {
+    if (validator.recycling) return;
+    validator.recycling = true;
+    validator.lastReason = reason;
+    console.log(`recycle: ${reason}`);
+    try {
+      setAutopilot(0);
+      engine.stop();
+      await chain.disconnect().catch(() => undefined);
+      await restartNodeAsync(nodeSettings().quarantine);
+      await deployProgramAsync();
+      chain = await connectChain(4);
+      engine = await LabEngine.create(chain);
+      await engine.start();
+      for (const r of recent) { r.tCommitted = undefined; r.committedBlock = undefined; }
+      engine.trackRecords(recent);
+      validator.startedAt = Date.now();
+      validator.recycles++;
+      validator.lastRecycleAt = Date.now();
+      setAutopilot(DEFAULT_AUTOPILOT_RATE);
+    } finally {
+      validator.recycling = false;
+    }
+  };
+  setInterval(() => {
+    if (Date.now() - validator.startedAt > RECYCLE_EVERY_MIN * 60_000) void recycle(`scheduled every ${RECYCLE_EVERY_MIN} min`).catch((e) => console.error('recycle failed', e));
+  }, 15_000);
+  let creepStrikes = 0;
+  setInterval(() => {
+    const window = engine.allRecords().filter((r) => r.path === 'injected' && !r.error && r.tPreconf !== undefined && Date.now() - r.submittedAt < 30_000);
+    const p50 = summarize(window.map((r) => r.tPreconf! - r.tSubmit))?.p50;
+    if (p50 === undefined || window.length < 20) return;
+    const validatorMs = p50 - 2 * netem.profile.oneWayMs;
+    creepStrikes = validatorMs > RECYCLE_IF_VALIDATOR_MS ? creepStrikes + 1 : 0;
+    if (creepStrikes >= 3) { creepStrikes = 0; void recycle(`validator-side median ${validatorMs.toFixed(0)} ms > ${RECYCLE_IF_VALIDATOR_MS} ms`).catch((e) => console.error('recycle failed', e)); }
+  }, 10_000);
   let autopilot: { child: ChildProcess | null; rate: number } = { child: null, rate: 0 };
   const setAutopilot = (rate: number) => {
     if (autopilot.child) {
@@ -187,6 +231,7 @@ async function main() {
           allTimeMeanMs: allTime.preconfirmed ? allTime.sumMs / allTime.preconfirmed : null,
         },
         autopilot: { rate: autopilot.rate, running: autopilot.child !== null },
+        validator: { startedAt: validator.startedAt, uptimeSec: Math.floor((Date.now() - validator.startedAt) / 1000), recycles: validator.recycles, lastRecycleAt: validator.lastRecycleAt, recycling: validator.recycling, lastReason: validator.lastReason, recycleEveryMin: RECYCLE_EVERY_MIN },
         network: { profile: netem.profile.name, oneWayMs: netem.profile.oneWayMs, jitterMs: netem.profile.jitterMs, note: netem.profile.note, calibration: cal, profiles: Object.values(table).map((p) => ({ name: p.name, oneWayMs: p.oneWayMs, note: p.note })) },
         latency: { preconf: preconfLat, e2e, histogram },
         throughput: { series, lastSecond: lastSecond.preconf, peak: Math.max(...series.map((b) => b.preconf)) },
@@ -242,6 +287,8 @@ async function main() {
       const depth = Number(cmd.depth);
       if (!Number.isInteger(depth) || depth < 1 || depth > 50) throw new Error('reorg depth must be an integer between 1 and 50');
       await anvilReorg(chain.publicClient, depth);
+    } else if (cmd.type === 'recycle') {
+      void recycle('requested from the page').catch((e) => console.error('recycle failed', e));
     } else if (cmd.type === 'network') {
       const p = table[cmd.profile];
       if (!p) throw new Error('unknown network profile');

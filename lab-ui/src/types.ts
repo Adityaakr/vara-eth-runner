@@ -48,6 +48,7 @@ export type Snapshot = {
   watcher: { headNumber: string; headHash: string; reorgs: number; lastReorgAt?: number; rpcErrors: number };
   totals: { txs: number; preconfirmed: number; committed: number; failed: number; pending: number; allTimeMinMs: number | null; allTimeMeanMs: number | null };
   autopilot: { rate: number; running: boolean };
+  validator: { startedAt: number; uptimeSec: number; recycles: number; lastRecycleAt: number | null; recycling: boolean; lastReason: string; recycleEveryMin: number };
   network: { profile: 'local' | 'measured' | 'global'; oneWayMs: number; jitterMs: number; note: string; calibration: { target: string; rttMs: number | null }; profiles: { name: string; oneWayMs: number; note: string }[] };
   latency: { preconf: Summary; e2e: Summary; histogram: { lo: number; hi: number; count: number }[] };
   throughput: { series: Bucket[]; lastSecond: number; peak: number };

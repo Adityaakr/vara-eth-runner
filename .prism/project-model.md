@@ -44,6 +44,8 @@
 - NETWORK EMULATION (2026-09-14): `lab-server/src/netem.ts` WS proxy :9945 → :9944, order-preserving per direction, one-way = calibrated RTT/2 (live `system_chain` to wss://rpc.vara.network ≈ 164–181 ms from this machine) + N(0,4) jitter + 2% spikes. Result p50 208–219 ms, p95 250–320 ms, min 183 ms at 25 tx/s with surges. `ws` message buffers must be copied before delayed forwarding.
 - Validator occasionally never delivers a promise (~0.5% under bursts, no node log); `sendAndWaitForReceipt` is now bounded by `LAB_RECEIPT_TIMEOUT_MS` (10 s) and counted as failed, otherwise every loop behind it hangs.
 
+- ROOT CAUSE of validator slowdown (2026-09-14): `ethexe run --dev --tmp` persists every micro-block to RocksDB and never prunes: 64 GB after 41 min at 25 tx/s (31k MBs), 135% CPU, MB cadence 10 → 80 ms. 23 abandoned tmp stores held 145 GB. start-node.sh now deletes `$TMPDIR/ethexe*` on start; serve.ts recycles node+deploy every LAB_RECYCLE_MINUTES (10) or when validator-side p50 (measured − emulated wire) > LAB_RECYCLE_VALIDATOR_MS (60) for 30 s; autopilot default lowered to 12 tx/s, surges 120@12 every 90 s.
+
 ## Decision log
 - 2026-09-14 G0: order book app; both write paths; no commits; Vite+React+viem UI, Node lab-server engine.
 

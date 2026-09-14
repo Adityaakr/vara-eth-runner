@@ -26,6 +26,8 @@ done
 if lsof -nP -iTCP:8545 -sTCP:LISTEN >/dev/null 2>&1; then
   pkill -9 -f "anvil -p 8545" 2>/dev/null || true; sleep 0.5
 fi
+# `--tmp` databases are never pruned by the node (64 GB after 40 min at 25 tx/s); reclaim old ones.
+rm -rf "${TMPDIR:-/tmp}"/ethexe* 2>/dev/null || true
 nohup "$ETHEXE" --cfg none run --dev --tmp \
   --rpc-port 9944 --rpc-cors all \
   --block-time "$BLOCK_TIME" \

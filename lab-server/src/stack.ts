@@ -1,5 +1,5 @@
 // Control of the local stack from the lab: restart the node with a quarantine, redeploy, reorg Anvil.
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PublicClient } from 'viem';
@@ -10,6 +10,19 @@ const NODE_LOG = resolve(LAB_ROOT, 'run/node.log');
 /** Restart the ethexe dev node (fresh Anvil, fresh DB) with the given canonical quarantine. */
 export function restartNode(quarantine: number): void {
   execFileSync(resolve(LAB_ROOT, 'run/start-node.sh'), ['--quarantine', String(quarantine)], { stdio: 'inherit', timeout: 120_000 });
+}
+
+/** Async variants for the long-running server, so a recycle does not block its event loop. */
+export function restartNodeAsync(quarantine: number): Promise<void> {
+  return runAsync(resolve(LAB_ROOT, 'run/start-node.sh'), ['--quarantine', String(quarantine)]);
+}
+export function deployProgramAsync(): Promise<void> {
+  return runAsync(resolve(LAB_ROOT, 'run/deploy.sh'), []);
+}
+function runAsync(file: string, args: string[]): Promise<void> {
+  return new Promise((res, rej) => {
+    execFile(file, args, { timeout: 180_000 }, (err, _out, stderr) => (err ? rej(new Error(`${file} failed: ${String(stderr).slice(-300)}`)) : res()));
+  });
 }
 
 /** Upload + create + init the orderbook program; writes run/mirror.addr. */
