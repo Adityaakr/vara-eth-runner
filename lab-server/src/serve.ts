@@ -1,6 +1,6 @@
 // WebSocket server for the explorer UI: streams engine snapshots and executes UI commands.
 // Usage: npm run serve  (ws://127.0.0.1:8787)
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execSync, spawn, type ChildProcess } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -27,8 +27,10 @@ const DEFAULT_AUTOPILOT_RATE = Number(process.env.LAB_AUTOPILOT_RATE ?? 12);
 /** The dev node persists every micro-block to an unpruned --tmp RocksDB (64 GB in 40 min at 25 tx/s) and slows
  * as it grows. The server recycles the stack on a timer and whenever the validator's own execution latency
  * (measured minus emulated wire) creeps, and says so on the page. */
-const RECYCLE_EVERY_MIN = Number(process.env.LAB_RECYCLE_MINUTES ?? 10);
-const RECYCLE_IF_VALIDATOR_MS = Number(process.env.LAB_RECYCLE_VALIDATOR_MS ?? 60);
+const RECYCLE_EVERY_MIN = Number(process.env.LAB_RECYCLE_MINUTES ?? 30);
+/** Recycle when the node's --tmp store exceeds this size. The store, not latency, is the real trigger:
+ * latency also rises from queueing under load and would recycle in a loop at high rates. */
+const RECYCLE_STORE_GB = Number(process.env.LAB_RECYCLE_STORE_GB ?? 8);
 const NETEM_PORT = Number(process.env.LAB_NETEM_PORT ?? 9945);
 const CALIBRATION_URL = process.env.LAB_CALIBRATE_URL ?? 'wss://rpc.vara.network';
 const DEFAULT_NET_PROFILE = (process.env.LAB_NET_PROFILE ?? 'measured') as NetProfile['name'];
@@ -113,17 +115,23 @@ async function main() {
     }
   };
   setInterval(() => {
-    if (Date.now() - validator.startedAt > RECYCLE_EVERY_MIN * 60_000) void recycle(`scheduled every ${RECYCLE_EVERY_MIN} min`).catch((e) => console.error('recycle failed', e));
+    if (!blastState.running && Date.now() - validator.startedAt > RECYCLE_EVERY_MIN * 60_000) void recycle(`scheduled every ${RECYCLE_EVERY_MIN} min`).catch((e) => console.error('recycle failed', e));
   }, 15_000);
-  let creepStrikes = 0;
+  const storeGb = (): number => {
+    try {
+      const dir = execSync("ls -td \"${TMPDIR:-/tmp}\"/ethexe* 2>/dev/null | head -1", { encoding: 'utf8' }).trim();
+      if (!dir) return 0;
+      return Number(execSync(`du -sk "${dir}" | cut -f1`, { encoding: 'utf8' }).trim()) / 1024 / 1024;
+    } catch {
+      return 0;
+    }
+  };
+  let lastStoreGb = 0;
   setInterval(() => {
-    const window = engine.allRecords().filter((r) => r.path === 'injected' && !r.error && r.tPreconf !== undefined && Date.now() - r.submittedAt < 30_000);
-    const p50 = summarize(window.map((r) => r.tPreconf! - r.tSubmit))?.p50;
-    if (p50 === undefined || window.length < 20) return;
-    const validatorMs = p50 - 2 * netem.profile.oneWayMs;
-    creepStrikes = validatorMs > RECYCLE_IF_VALIDATOR_MS ? creepStrikes + 1 : 0;
-    if (creepStrikes >= 3) { creepStrikes = 0; void recycle(`validator-side median ${validatorMs.toFixed(0)} ms > ${RECYCLE_IF_VALIDATOR_MS} ms`).catch((e) => console.error('recycle failed', e)); }
-  }, 10_000);
+    if (validator.recycling || blastState.running) return;
+    lastStoreGb = storeGb();
+    if (lastStoreGb > RECYCLE_STORE_GB) void recycle(`validator store ${lastStoreGb.toFixed(1)} GB > ${RECYCLE_STORE_GB} GB`).catch((e) => console.error('recycle failed', e));
+  }, 30_000);
   let autopilot: { child: ChildProcess | null; rate: number } = { child: null, rate: 0 };
   const setAutopilot = (rate: number) => {
     if (autopilot.child) {
@@ -259,7 +267,7 @@ async function main() {
           allTimeMeanMs: allTime.preconfirmed ? allTime.sumMs / allTime.preconfirmed : null,
         },
         autopilot: { rate: autopilot.rate, running: autopilot.child !== null },
-        validator: { startedAt: validator.startedAt, uptimeSec: Math.floor((Date.now() - validator.startedAt) / 1000), recycles: validator.recycles, lastRecycleAt: validator.lastRecycleAt, recycling: validator.recycling, lastReason: validator.lastReason, recycleEveryMin: RECYCLE_EVERY_MIN },
+        validator: { startedAt: validator.startedAt, uptimeSec: Math.floor((Date.now() - validator.startedAt) / 1000), recycles: validator.recycles, lastRecycleAt: validator.lastRecycleAt, recycling: validator.recycling, lastReason: validator.lastReason, recycleEveryMin: RECYCLE_EVERY_MIN, storeGb: lastStoreGb, storeLimitGb: RECYCLE_STORE_GB },
         network: { profile: netem.profile.name, oneWayMs: netem.profile.oneWayMs, jitterMs: netem.profile.jitterMs, note: netem.profile.note, calibration: cal, profiles: Object.values(table).map((p) => ({ name: p.name, oneWayMs: p.oneWayMs, note: p.note })) },
         latency: { preconf: preconfLat, e2e, histogram },
         throughput: { series, lastSecond: lastSecond.preconf, peak: Math.max(...series.map((b) => b.preconf)) },

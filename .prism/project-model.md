@@ -53,6 +53,8 @@
 
 - Wallet Send (2026-09-14): `ledger/` program (transfer/faucet/balance_of, 1 event per call), deployed by `run/deploy-ledger.sh` → `run/ledger.addr`; server commands `balance`, `prepare{kind:transfer|faucet|place}`; engine `prepareCall`/`queryRaw`; ledger records are `untracked` (L1 watcher follows only the order book). sails-js accepts a 20-byte hex for the `Address(H160)` struct.
 
+- Recycle trigger changed (2026-09-14): latency creep could not distinguish queueing under load from store bloat and looped at 300 tx/s. Now: scheduled every LAB_RECYCLE_MINUTES (30) or when the node's tmp store exceeds LAB_RECYCLE_STORE_GB (8), never during a load test.
+
 ## Decision log
 - 2026-09-14 G0: order book app; both write paths; no commits; Vite+React+viem UI, Node lab-server engine.
 
