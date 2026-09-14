@@ -104,7 +104,9 @@ async function main() {
       chain = await connectChain(4);
       engine = await LabEngine.create(chain);
       await engine.start();
-      for (const r of recent) { r.tCommitted = undefined; r.committedBlock = undefined; }
+      // Records from the previous chain can never settle on the new one: drop them rather than let
+      // them read as stuck or skew the settlement statistics. All-time counters are kept.
+      recent.length = 0;
       engine.trackRecords(recent);
       validator.startedAt = Date.now();
       validator.recycles++;
