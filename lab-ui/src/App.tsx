@@ -27,6 +27,7 @@ export default function App() {
 /** Pure view of one snapshot; also rendered server-side by scripts/render-check.tsx. */
 export function LabView({ snap, lastError, send, request }: { snap: Snapshot; lastError: string | null; send: (cmd: object) => void; request?: Req }) {
   const [wallet, setWallet] = useState(false);
+  const [controls, setControls] = useState(false);
   const [session, setSession] = useState<PasskeySession | null>(null);
   const stuck = snap.records.filter((r) => !r.error && r.tCommitted === undefined && snap.now - r.submittedAt > STUCK_AFTER_MS).length;
   const live = !snap.preconfError && stuck === 0;
@@ -40,6 +41,7 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
         <div className="meta">
           <span className={`chip ${live ? '' : 'off'}`}><i />{live ? 'Validator live' : 'Degraded'}</span>
           <span className="mono">{`Ethereum block ${snap.ethHead}`}</span>
+          <button className="btn line" onClick={() => setControls(true)}>Controls</button>
           <button className="btn" onClick={() => setWallet(true)}>{session ? `Wallet · ${session.address.slice(0, 6)}…${session.address.slice(-4)}` : 'Wallet'}</button>
         </div>
       </div>
@@ -58,8 +60,6 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
           <div className="tile"><div className="k">Fastest</div><div className="v mint">{ms0(snap.totals.allTimeMinMs, 1)}<u>ms</u></div><div className="s">since start</div></div>
           <div className="tile"><div className="k">Pre-confirmed txs</div><div className="v">{n(snap.totals.preconfirmed)}</div><div className="s">since start</div></div>
         </div>
-
-        <Toolbar send={send} snap={snap} />
 
         <div className="panel" style={{ marginTop: 14 }}>
           <h2>Transactions <span className="r">{`newest first · ${n(snap.totals.preconfirmed)} pre-confirmed`}</span></h2>
@@ -97,6 +97,16 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
         <p className="note dim">{`Program instance ${snap.mirror} · single local validator on one machine; figures are measured, not quoted.`}</p>
       </div>
       {wallet && <Wallet session={session} setSession={setSession} request={request} onClose={() => setWallet(false)} records={snap.records} />}
+      {controls && (
+        <>
+          <div className="scrim" onClick={() => setControls(false)} />
+          <div className="drawer">
+            <div className="head"><b>Controls</b><button className="btn line" onClick={() => setControls(false)}>Close</button></div>
+            <Toolbar send={send} snap={snap} />
+            <p className="note">Network: every frame to and from the validator is delayed by a one-way latency; the measured profile is calibrated live. Traffic: the autopilot keeps a steady rate across four program instances with periodic surges. Load test: a burst with the given number in flight, run in its own process.</p>
+          </div>
+        </>
+      )}
     </div>
   );
 }
