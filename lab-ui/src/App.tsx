@@ -16,7 +16,7 @@ export default function App() {
   if (!lab.snap) {
     return (
       <div>
-        <div className="mast"><div className="mark"><img src="/vara-eth-logo.svg" alt="Vara.eth" />VARA.ETH <span>Pre-confirmation · Faster UX</span></div><div className="meta"><span className="chip off"><i />{lab.status === 'open' ? 'connecting' : 'server offline'}</span></div></div>
+        <div className="mast"><div className="mark"><img src="/vara-eth-mark.svg" alt="Vara.eth" />VARA.ETH <span>Pre-confirmation · Faster UX</span></div><div className="meta"><span className="chip off"><i />{lab.status === 'open' ? 'connecting' : 'server offline'}</span></div></div>
         <div className="page"><p className="note">Start the telemetry server: <code>cd lab-server && npm run serve</code></p></div>
       </div>
     );
@@ -36,7 +36,7 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
   return (
     <div>
       <div className="mast">
-        <div className="mark"><img src="/vara-eth-logo.svg" alt="Vara.eth" />VARA.ETH <span>Pre-confirmation · Faster UX</span></div>
+        <div className="mark"><img src="/vara-eth-mark.svg" alt="Vara.eth" />VARA.ETH <span>Pre-confirmation · Faster UX</span></div>
         <div className="meta">
           <button className="btn line" onClick={() => setControls(true)}>Controls</button>
           <button className="btn" onClick={() => setWallet(true)}>{session ? `Wallet · ${session.address.slice(0, 6)}…${session.address.slice(-4)}` : 'Wallet'}</button>
