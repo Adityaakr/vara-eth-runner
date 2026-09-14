@@ -62,15 +62,9 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
 
         <Toolbar send={send} snap={snap} />
 
-        <div className="grid">
-          <div className="panel">
-            <h2>Transactions <span className="r">{`newest first · ${n(snap.totals.preconfirmed)} pre-confirmed`}</span></h2>
-            <TxTable records={snap.records} mine={session?.address} />
-          </div>
-          <div className="panel">
-            <h2>Latency distribution <span className="r">recent</span></h2>
-            <Histogram bins={snap.latency.histogram} />
-          </div>
+        <div className="panel" style={{ marginTop: 14 }}>
+          <h2>Transactions <span className="r">{`newest first · ${n(snap.totals.preconfirmed)} pre-confirmed`}</span></h2>
+          <TxTable records={snap.records} mine={session?.address} />
         </div>
 
         <div className="grid2">
@@ -134,25 +128,6 @@ function Band({ series, network, latency }: { series: Snapshot['throughput']['se
       <div className="band-foot">
         <span><b className="mint">{`${n(total)} tx`}</b> pre-confirmed in the last 3 min · peak <b>{`${peak} tx/s`}</b></span>
         <span className="right">{latency ? <>median <b className="mint">{`${latency.p50.toFixed(0)} ms`}</b> · </> : null}{network.profile === 'local' ? 'loopback, no wire emulation' : <>{`${(network.oneWayMs * 2).toFixed(0)} ms round trip emulated`} · <span className="dim">{`calibrated live · ${network.calibration.target}`}</span></>}</span>
-      </div>
-    </div>
-  );
-}
-
-function Histogram({ bins }: { bins: Snapshot['latency']['histogram'] }) {
-  const total = bins.reduce((a, b) => a + b.count, 0);
-  const max = Math.max(1, ...bins.map((b) => b.count));
-  if (total === 0) return <p className="note">No pre-confirmations yet.</p>;
-  return (
-    <div>
-      <div className="hist">
-        {bins.map((b) => (
-          <div key={b.lo} style={{ display: 'contents' }}>
-            <div className="lab">{b.hi === Infinity || b.hi === null ? `≥ ${b.lo}` : `${b.lo}–${b.hi}`}</div>
-            <div className={`bar ${b.lo >= 100 ? 'hot' : ''}`}><i style={{ width: `${(b.count / max) * 100}%` }} /></div>
-            <div className="cnt">{`${((b.count / total) * 100).toFixed(0)}%`}</div>
-          </div>
-        ))}
       </div>
     </div>
   );
