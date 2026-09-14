@@ -41,6 +41,9 @@
 - Sustained-load creep: each order emits 2 events; Ethereum settlement absorbs ~120 events per 1 s block, so above ~60 tx/s the unsettled backlog grows and p50 creeps (24→51 ms over 3.5 min at 60 tx/s). Autopilot default set to 25 tx/s + 250-tx surges every 75 s.
 - Dashboard v4: Vara palette (mint #00e6b8 on green-black), sans text + mono numerals, KPI ribbon, area chart + latency histogram, tape with inline latency bars, wallet drawer (passkey), collapsed fault-injection section.
 
+- NETWORK EMULATION (2026-09-14): `lab-server/src/netem.ts` WS proxy :9945 → :9944, order-preserving per direction, one-way = calibrated RTT/2 (live `system_chain` to wss://rpc.vara.network ≈ 164–181 ms from this machine) + N(0,4) jitter + 2% spikes. Result p50 208–219 ms, p95 250–320 ms, min 183 ms at 25 tx/s with surges. `ws` message buffers must be copied before delayed forwarding.
+- Validator occasionally never delivers a promise (~0.5% under bursts, no node log); `sendAndWaitForReceipt` is now bounded by `LAB_RECEIPT_TIMEOUT_MS` (10 s) and counted as failed, otherwise every loop behind it hangs.
+
 ## Decision log
 - 2026-09-14 G0: order book app; both write paths; no commits; Vite+React+viem UI, Node lab-server engine.
 

@@ -10,6 +10,15 @@ import type { WriteRecord } from './timeline.js';
 import { L1Watcher, type ObservedEvent } from './l1watch.js';
 import type { BookView } from './sails.js';
 
+const RECEIPT_TIMEOUT_MS = Number(process.env.LAB_RECEIPT_TIMEOUT_MS ?? 10_000);
+
+function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(message)), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
+}
+
 export interface PreparedInjected {
   tx: Awaited<ReturnType<LabEngine['createInjectedTx']>>;
   rec: WriteRecord;
@@ -96,9 +105,11 @@ export class LabEngine {
     rec.tSubmit = performance.now();
     let receipt;
     try {
-      receipt = await tx.sendAndWaitForReceipt();
+      // A validator occasionally never delivers a promise (observed ~1 in 100 under bursts); without a
+      // bound the caller would wait forever and stall every loop behind it.
+      receipt = await withTimeout(tx.sendAndWaitForReceipt(), RECEIPT_TIMEOUT_MS, `no validator receipt within ${RECEIPT_TIMEOUT_MS / 1000} s`);
     } catch (err) {
-      rec.error = `send failed: ${String(err)}`;
+      rec.error = `send failed: ${err instanceof Error ? err.message : String(err)}`;
       return rec;
     }
     rec.tPreconf = performance.now();

@@ -77,6 +77,14 @@ run/start-node.sh --quarantine 0 && run/deploy.sh
 
 Experiments, from `lab-server`: `npm test`, `npm run blast -- 1000 64 8`, `npm run bench -- 30`, `npm run reorg-matrix`.
 
+## Network conditions
+
+Loopback flatters the figures. The server runs a WebSocket emulator in front of the validator RPC that delays every frame
+by a one-way latency **calibrated live** against `wss://rpc.vara.network` (the region Vara.eth validators are hosted in;
+~180 ms round trip from Mumbai), plus jitter and occasional spikes. With it on, pre-confirmations measure ~210 ms median,
+~250 ms p95, which is what a hosted validator would deliver from here. Profiles: loopback, measured, global (240 ms).
+Select on the page or set `LAB_NET_PROFILE`, `LAB_CALIBRATE_URL`.
+
 ## Notes
 
 - Latency is one clock in one process: `tSubmit` after signing, `tPreconf` on the validator-signed receipt, `tCommitted` when the log is seen on Ethereum.

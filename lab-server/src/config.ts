@@ -9,7 +9,9 @@ export const LAB_ROOT = resolve(here, '..', '..');
 
 export const ETH_RPC_HTTP = process.env.ETH_RPC_HTTP ?? 'http://127.0.0.1:8545';
 export const ETH_RPC_WS = process.env.ETH_RPC_WS ?? 'ws://127.0.0.1:8545';
-export const VARA_ETH_RPC_WS = process.env.VARA_ETH_RPC_WS ?? 'ws://127.0.0.1:9944';
+/** Read at connect time so the server can route engines through the network emulator. */
+export const varaEthRpcWs = () => process.env.VARA_ETH_RPC_WS ?? 'ws://127.0.0.1:9944';
+export const VARA_ETH_RPC_DIRECT = 'ws://127.0.0.1:9944';
 export const CHAIN_ID = 31337;
 
 export const IDL_PATH = resolve(LAB_ROOT, 'orderbook/target/wasm32-gear/release/orderbook.idl');

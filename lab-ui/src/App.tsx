@@ -53,12 +53,12 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
           <div className="hero">
             <div className="v">{ms0(pre?.p50)}<u>ms</u></div>
             <div className="k">Pre-confirmation · median</div>
-            <div className="s">{pre ? `submission → validator-signed result · n = ${n(pre.count)}` : 'awaiting traffic'}</div>
+            <div className="s">{pre ? `submission → validator-signed result · n = ${n(pre.count)} · network: ${snap.network.profile === 'local' ? 'loopback' : `${(snap.network.oneWayMs * 2).toFixed(0)} ms round trip emulated`}` : 'awaiting traffic'}</div>
           </div>
           <div className="stat"><div className="k">p95</div><div className="v">{ms0(pre?.p95)}<u>ms</u></div><div className="s">{pre ? `max ${ms0(pre.max)} ms` : ''}</div></div>
           <div className="stat"><div className="k">Fastest</div><div className="v mint">{ms0(snap.totals.allTimeMinMs, 1)}<u>ms</u></div><div className="s">since start</div></div>
           <div className="stat"><div className="k">Throughput</div><div className="v">{n(snap.throughput.lastSecond)}<u>tx/s</u></div><div className="s">{`peak ${n(snap.throughput.peak)} · 3 min`}</div></div>
-          <div className="stat"><div className="k">Transactions</div><div className="v">{n(snap.totals.txs)}</div><div className="s">{`${snap.totals.failed} rejected`}</div></div>
+          <div className="stat"><div className="k">Transactions</div><div className="v">{n(snap.totals.txs)}</div><div className="s">{`${snap.totals.failed} failed`}</div></div>
         </div>
 
         <Toolbar send={send} snap={snap} />
@@ -67,7 +67,7 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
           <div className="panel">
             <h2>Throughput and latency <span className="r">last 180 s · one-second resolution</span></h2>
             <Chart series={snap.throughput.series} />
-            <p className="note">Bars: transactions pre-confirmed per second. Line: median pre-confirmation latency in that second, right-hand scale. Measured from submission to receipt of the validator-signed result on one clock; signing excluded.</p>
+            <p className="note">Bars: transactions pre-confirmed per second. Line: median pre-confirmation latency in that second, right-hand scale. Measured from submission to receipt of the validator-signed result on one clock; signing excluded. The network emulator delays every frame to and from the validator by a one-way latency calibrated against a live Gear endpoint, so the figures reflect a hosted validator rather than a loopback.</p>
           </div>
           <div className="panel">
             <h2>Latency distribution <span className="r">recent pre-confirmations</span></h2>
@@ -200,6 +200,12 @@ function Toolbar({ send, snap }: { send: (cmd: object) => void; snap: Snapshot }
   const last = snap.blast.last;
   return (
     <div className="toolbar">
+      <b>Network</b>
+      <select value={snap.network.profile} onChange={(e) => send({ type: 'network', profile: e.target.value })} style={{ background: 'var(--bg)', color: 'var(--ink)', border: '1px solid var(--rule2)', padding: '5px 8px', font: 'inherit' }}>
+        {snap.network.profiles.map((p) => <option key={p.name} value={p.name}>{p.name === 'local' ? 'Loopback (no emulation)' : p.name === 'measured' ? `Measured WAN · ${(p.oneWayMs * 2).toFixed(0)} ms RTT` : `Global · ${(p.oneWayMs * 2).toFixed(0)} ms RTT`}</option>)}
+      </select>
+      <span title={snap.network.note}>{snap.network.calibration.rttMs ? `calibrated live against ${snap.network.calibration.target}` : 'calibration unavailable, default 160 ms'}</span>
+      <span className="sep" />
       <b>Traffic generator</b>
       <span className="stat">{snap.autopilot.running ? `${snap.autopilot.rate} tx/s steady, periodic 250-tx surges` : 'paused'}</span>
       <input value={rate} onChange={(e) => setRate(e.target.value)} />

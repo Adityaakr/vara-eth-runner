@@ -15,18 +15,24 @@ import { LabEngine, type PreparedInjected } from './engine.js';
 import type { Hex } from 'viem';
 import { anvilReorg } from './stack.js';
 import { statsFor, summarize, type WriteRecord } from './timeline.js';
+import { NetEmulator, calibrate, profiles, type NetProfile } from './netem.js';
+import { VARA_ETH_RPC_DIRECT } from './config.js';
 
 const PORT = Number(process.env.LAB_WS_PORT ?? 8787);
 const BLAST_SENDERS = 4;
 const HISTORY_SECONDS = 180;
 const RECENT_MAX = 4000;
 const DEFAULT_AUTOPILOT_RATE = Number(process.env.LAB_AUTOPILOT_RATE ?? 25);
+const NETEM_PORT = Number(process.env.LAB_NETEM_PORT ?? 9945);
+const CALIBRATION_URL = process.env.LAB_CALIBRATE_URL ?? 'wss://rpc.vara.network';
+const DEFAULT_NET_PROFILE = (process.env.LAB_NET_PROFILE ?? 'measured') as NetProfile['name'];
 
 type Command =
   | { type: 'place'; path: 'injected' | 'l1'; side: number; price: string; qty: string }
   | { type: 'reorg'; depth: number }
   | { type: 'blast'; total: number; concurrency: number }
   | { type: 'autopilot'; rate: number }
+  | { type: 'network'; profile: NetProfile['name'] }
   | { type: 'prepare'; side: number; price: string; qty: string }
   | { type: 'submitSigned'; prepId: string; signature: string; address: string };
 
@@ -36,6 +42,15 @@ function wallOf(r: WriteRecord, t: number | undefined): number | undefined {
 }
 
 async function main() {
+  // Network emulation: every engine (this process and its children) talks to the validator through
+  // a proxy that delays frames by a calibrated one-way latency. Calibration is a live round trip to
+  // Gear's public Vara RPC, i.e. the region where Vara.eth validators are hosted.
+  const cal = await calibrate(CALIBRATION_URL, 'system_chain');
+  const table = profiles(cal);
+  const netem = new NetEmulator(VARA_ETH_RPC_DIRECT, table[DEFAULT_NET_PROFILE] ?? table.measured);
+  netem.listen(NETEM_PORT);
+  process.env.VARA_ETH_RPC_WS = `ws://127.0.0.1:${NETEM_PORT}`;
+  console.log(`network emulation: ${netem.profile.name} (${netem.profile.note}); one-way ${netem.profile.oneWayMs.toFixed(0)} ms`);
   const chain = await connectChain(4);
   const engine = await LabEngine.create(chain);
   await engine.start();
@@ -172,6 +187,7 @@ async function main() {
           allTimeMeanMs: allTime.preconfirmed ? allTime.sumMs / allTime.preconfirmed : null,
         },
         autopilot: { rate: autopilot.rate, running: autopilot.child !== null },
+        network: { profile: netem.profile.name, oneWayMs: netem.profile.oneWayMs, jitterMs: netem.profile.jitterMs, note: netem.profile.note, calibration: cal, profiles: Object.values(table).map((p) => ({ name: p.name, oneWayMs: p.oneWayMs, note: p.note })) },
         latency: { preconf: preconfLat, e2e, histogram },
         throughput: { series, lastSecond: lastSecond.preconf, peak: Math.max(...series.map((b) => b.preconf)) },
         blocks: await blockRows(),
@@ -226,6 +242,10 @@ async function main() {
       const depth = Number(cmd.depth);
       if (!Number.isInteger(depth) || depth < 1 || depth > 50) throw new Error('reorg depth must be an integer between 1 and 50');
       await anvilReorg(chain.publicClient, depth);
+    } else if (cmd.type === 'network') {
+      const p = table[cmd.profile];
+      if (!p) throw new Error('unknown network profile');
+      netem.profile = p;
     } else if (cmd.type === 'autopilot') {
       const rate = Math.min(300, Math.max(0, Number(cmd.rate) || 0));
       setAutopilot(rate);
