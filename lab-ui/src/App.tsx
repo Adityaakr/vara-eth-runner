@@ -51,7 +51,7 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
         {snap.validator.recycling && <div className="alert" style={{ borderColor: 'var(--mint)', background: 'color-mix(in srgb, var(--mint) 8%, transparent)' }}>Recycling the dev validator: fresh node and Anvil, program redeployed. The single dev node persists every micro-block to an unpruned store and slows as it grows, so the lab restarts it on a schedule. Traffic resumes in about 20 s.</div>}
         {stuck > 0 && !snap.validator.recycling && <div className="alert">{`${stuck} pre-confirmed transaction${stuck > 1 ? 's have' : ' has'} not settled on Ethereum for over ${STUCK_AFTER_MS / 1000} s. The validator continues to pre-confirm but is no longer committing, the signature of a reorg deeper than its anchor. Restart with run/start-node.sh.`}</div>}
 
-        <Band series={snap.throughput.series} network={snap.network} latency={snap.latency.preconf} />
+        <Band series={snap.throughput.series} />
 
         <div className="tiles">
           <div className="tile"><div className="k">Latest height</div><div className="v">{snap.ethHead}</div></div>
@@ -111,7 +111,7 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
   );
 }
 
-function Band({ series, network, latency }: { series: Snapshot['throughput']['series']; network: Snapshot['network']; latency: Snapshot['latency']['preconf'] }) {
+function Band({ series }: { series: Snapshot['throughput']['series'] }) {
   const w = 1000;
   const h = 100;
   const tps = series.map((b) => b.preconf);
@@ -119,10 +119,8 @@ function Band({ series, network, latency }: { series: Snapshot['throughput']['se
   // Scale to the steady traffic so the band reads as a solid mass; surges clip at the top.
   const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
   const maxTps = Math.max(6, p95 * 1.1);
-  const peak = Math.max(...tps, 0);
   const bw = w / series.length;
   const layers = ['#7dffe0', '#3dffcf', '#00f0b8', '#00c896', '#009e78', '#0a7a60', '#0e5a48', '#123f35'];
-  const total = tps.reduce((a, b) => a + b, 0);
   return (
     <div className="band">
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
@@ -134,10 +132,6 @@ function Band({ series, network, latency }: { series: Snapshot['throughput']['se
         {series.map((b, i) => { const bh = Math.max(0, Math.min(1, b.preconf / maxTps) * h); return bh > 0 ? <rect key={b.t} x={i * bw} y={h - bh} width={bw + 0.3} height={bh} fill="url(#bandfill)" /> : null; })}
         <line x1={0} x2={w} y1={h} y2={h} stroke="#34335c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
       </svg>
-      <div className="band-foot">
-        <span><b className="mint">{`${n(total)} tx`}</b> pre-confirmed in the last 3 min · peak <b>{`${peak} tx/s`}</b></span>
-        <span className="right">{latency ? <>median <b className="mint">{`${latency.p50.toFixed(0)} ms`}</b> · </> : null}{network.profile === 'local' ? 'loopback, no wire emulation' : <>{`${(network.oneWayMs * 2).toFixed(0)} ms round trip emulated`} · <span className="dim">{`calibrated live · ${network.calibration.target}`}</span></>}</span>
-      </div>
     </div>
   );
 }
