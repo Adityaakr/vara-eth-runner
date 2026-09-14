@@ -17,7 +17,7 @@ const snap = await new Promise<Snapshot>((resolve, reject) => {
   ws.on('error', reject);
 });
 const html = renderToString(<LabView snap={snap} lastError={null} send={() => {}} />);
-const must = ['Executed before the next block', 'Median pre-confirm', 'Controls', 'Transactions', 'Ethereum settlement'];
+const must = ['Validator pre-confirmation and Ethereum settlement', 'Median pre-confirm', 'Controls', 'Transactions', 'Ethereum settlement'];
 const missing = must.filter((m) => !html.includes(m));
 if (missing.length) {
   console.error('render-check FAILED, missing:', missing);
