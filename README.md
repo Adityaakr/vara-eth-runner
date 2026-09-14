@@ -1,5 +1,3 @@
-<p align="left"><img src="docs/vara-eth-mark.svg" width="64" alt="Vara.eth" /></p>
-
 # vara-eth-runner
 
 A local Vara.eth lab that measures what a validator pre-confirmation is worth: how fast it arrives, how much throughput one validator sustains, how long until Ethereum settles it, and what happens to it when Ethereum reorganises.

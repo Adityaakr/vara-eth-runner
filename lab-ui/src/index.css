@@ -10,7 +10,6 @@ html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: v
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .mast { display: flex; align-items: center; gap: 20px; padding: 14px 28px; border-bottom: 1px solid var(--rule); background: linear-gradient(180deg, #17162c 0%, var(--bg) 100%); }
 .mark { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .12em; font-size: 13px; }
-.mark img { width: 28px; height: 28px; border-radius: 6px; }
 .mark span { color: var(--ink2); font-weight: 400; letter-spacing: .04em; }
 .mast .meta { margin-left: auto; display: flex; gap: 18px; align-items: center; color: var(--ink2); font-size: 12px; }
 .chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--rule2); padding: 4px 10px; border-radius: 2px; color: var(--ink); }

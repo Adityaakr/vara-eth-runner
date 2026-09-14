@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
-  <rect width="108" height="108" rx="22" fill="#b6f5d5"/>
-  <g transform="translate(24 32) scale(0.56)" fill="#1c1b33">
-    <!-- V -->
-    <path d="M0 4 H14 L34 48 L54 4 H68 L42 62 H26 Z"/>
-    <!-- angular C -->
-    <path d="M66 4 H108 V16 H74 L64 33 L74 50 H108 V62 H66 L50 33 Z"/>
-  </g>
-</svg>
