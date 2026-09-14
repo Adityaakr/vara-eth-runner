@@ -70,7 +70,6 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
           <div className="panel">
             <h2>Latency distribution <span className="r">recent</span></h2>
             <Histogram bins={snap.latency.histogram} />
-            <p className="note" style={{ marginTop: 14 }}>Pre-confirmation latency is measured from submission to the validator-signed result on one clock; signing excluded. Frames to and from the validator are delayed by a one-way latency calibrated live against a Gear endpoint, so figures reflect a hosted validator, not loopback.</p>
           </div>
         </div>
 
@@ -155,7 +154,6 @@ function Histogram({ bins }: { bins: Snapshot['latency']['histogram'] }) {
           </div>
         ))}
       </div>
-      <p className="note">Milliseconds from submission to signed result, {n(total)} most recent transactions. Buckets at or above 100 ms are shaded amber.</p>
     </div>
   );
 }
