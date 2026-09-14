@@ -98,27 +98,29 @@ async function main() {
       pump();
     }, burstEverySec * 1000);
   }
-  // Housekeeping: every few seconds, each instance cancels its oldest resting orders once the book
-  // grows past a threshold. Cancels are real transactions on the tape and keep the book bounded.
-  const CANCEL_ABOVE = 24;
-  const CANCEL_DOWN_TO = 12;
+  // Housekeeping: each engine cancels a few of ITS OWN oldest resting orders when the instance's book
+  // grows past a threshold. Only the owner can cancel, so other processes' orders are left alone, and
+  // at most a handful go per tick so cancels stay a small share of the tape.
+  const CANCEL_ABOVE = 40;
+  const CANCEL_PER_TICK = 3;
   setInterval(() => {
-    engines.forEach((engine, idx) => {
+    engines.forEach((engine) => {
+      const me = engine.chain.sender.address.toLowerCase();
       engine
         .preconfBook()
         .then(async (view) => {
-          const resting = [...view.bids, ...view.asks].sort((a, b) => (a.id < b.id ? -1 : 1));
+          const resting = [...view.bids, ...view.asks];
           if (resting.length <= CANCEL_ABOVE) return;
-          for (const o of resting.slice(0, resting.length - CANCEL_DOWN_TO)) {
+          const mine = resting.filter((o) => o.owner.toLowerCase() === me).sort((a, b) => (a.id < b.id ? -1 : 1)).slice(0, CANCEL_PER_TICK);
+          for (const o of mine) {
             inFlight++;
             const rec = await engine.cancelInjected(o.id).finally(() => inFlight--);
             console.log(JSON.stringify({ record: rec }, bigintReplacer));
           }
-          console.error(`traffic: instance ${idx} cancelled ${resting.length - CANCEL_DOWN_TO} resting orders`);
         })
         .catch((err) => console.error('cancel sweep failed', err));
     });
-  }, 4_000);
+  }, 3_000);
   console.error(`traffic: ${rate} tx/s target, ${senders} senders, max in flight ${maxInFlight}, burst ${burstSize} every ${burstEverySec} s`);
 }
 
