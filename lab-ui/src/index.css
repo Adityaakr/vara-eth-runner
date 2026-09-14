@@ -45,8 +45,8 @@ html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: v
 .panel { background: var(--bg2); border: 1px solid var(--rule); border-radius: 3px; padding: 14px 16px; }
 .panel h2 { margin: 0 0 10px; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink2); font-weight: 600; display: flex; align-items: baseline; gap: 12px; }
 .panel h2 .r { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; font-family: var(--mono); }
-.chart { height: 190px; position: relative; } .chart svg { width: 100%; height: 100%; display: block; }
-.chart .lbl { position: absolute; font-size: 10.5px; color: var(--ink2); font-family: var(--mono); } .chart .lbl.tl { left: 0; top: 0; } .chart .lbl.tr { right: 0; top: 0; color: var(--blue); }
+.chart { height: 200px; position: relative; padding-top: 14px; } .chart svg { width: 100%; height: 100%; display: block; }
+.chart .lbl { position: absolute; top: 0; font-size: 10.5px; font-family: var(--mono); letter-spacing: .04em; } .chart .lbl.tl { left: 0; color: var(--mint); } .chart .lbl.tr { right: 0; color: #8ec2ff; }
 .hist { display: grid; grid-template-columns: 56px 1fr 44px; gap: 6px 10px; align-items: center; font-family: var(--mono); font-size: 11.5px; }
 .hist .lab { color: var(--ink2); text-align: right; } .hist .cnt { color: var(--ink2); text-align: right; }
 .hist .bar { height: 12px; background: var(--bg3); border-radius: 1px; overflow: hidden; } .hist .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--mint2), var(--mint)); }

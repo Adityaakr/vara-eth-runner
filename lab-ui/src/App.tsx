@@ -67,7 +67,7 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
           <div className="panel">
             <h2>Throughput and latency <span className="r">last 180 s · one-second resolution</span></h2>
             <Chart series={snap.throughput.series} />
-            <p className="note">Area: transactions pre-confirmed per second. Line: median pre-confirmation latency in that second. Latency is measured from submission to receipt of the validator-signed execution result on one monotonic clock; signing is excluded.</p>
+            <p className="note">Bars: transactions pre-confirmed per second. Line: median pre-confirmation latency in that second, right-hand scale. Measured from submission to receipt of the validator-signed result on one clock; signing excluded.</p>
           </div>
           <div className="panel">
             <h2>Latency distribution <span className="r">recent pre-confirmations</span></h2>
@@ -118,28 +118,59 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
 function Chart({ series }: { series: Snapshot['throughput']['series'] }) {
   const w = 1000;
   const h = 170;
+  const pad = 6;
   const maxTps = Math.max(10, ...series.map((b) => b.preconf));
-  const maxMs = Math.max(20, ...series.map((b) => b.p50 ?? 0));
+  // Robust latency scale: 1.25 × the 90th percentile of the window's medians, capped, so one outlier
+  // second cannot flatten the whole line.
+  const meds = series.map((b) => b.p50).filter((x): x is number => x !== null).sort((a, b) => a - b);
+  const p90 = meds.length ? meds[Math.min(meds.length - 1, Math.floor(meds.length * 0.9))] : 20;
+  const maxMs = Math.min(800, Math.max(25, p90 * 1.25));
   const bw = w / series.length;
-  const area = series.map((b, i) => `${(i * bw).toFixed(1)},${(h - (b.preconf / maxTps) * h).toFixed(1)}`).join(' ');
-  const pts = series.map((b, i) => (b.p50 === null ? null : `${(i * bw + bw / 2).toFixed(1)},${(h - (b.p50 / maxMs) * h * 0.85).toFixed(1)}`));
+  const pts = series.map((b, i) => (b.p50 === null ? null : { x: i * bw + bw / 2, y: h - pad - (Math.min(b.p50, maxMs) / maxMs) * (h - 2 * pad) }));
   const segs: string[] = [];
-  let cur: string[] = [];
-  for (const p of pts) { if (p) cur.push(p); else if (cur.length) { segs.push(cur.join(' ')); cur = []; } }
-  if (cur.length) segs.push(cur.join(' '));
+  let cur: { x: number; y: number }[] = [];
+  const flush = () => {
+    if (cur.length === 1) segs.push(`M${cur[0].x.toFixed(1)},${cur[0].y.toFixed(1)} h${(bw / 2).toFixed(1)}`);
+    else if (cur.length > 1) segs.push(smooth(cur));
+    cur = [];
+  };
+  for (const p of pts) { if (p) cur.push(p); else flush(); }
+  flush();
   return (
     <div className="chart">
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-        <defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#00e6b8" stopOpacity="0.55" /><stop offset="1" stopColor="#00e6b8" stopOpacity="0.02" /></linearGradient></defs>
-        {[0.25, 0.5, 0.75].map((f) => <line key={f} x1={0} x2={w} y1={h * f} y2={h * f} stroke="#183029" strokeWidth="1" vectorEffect="non-scaling-stroke" />)}
-        <polygon points={`0,${h} ${area} ${w},${h}`} fill="url(#area)" />
-        <polyline points={area} fill="none" stroke="#00e6b8" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-        {segs.map((s, i) => <polyline key={i} points={s} fill="none" stroke="#6cb5ff" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeDasharray="4 3" />)}
+        <defs>
+          <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#00ffc4" stopOpacity="0.95" /><stop offset="1" stopColor="#00ffc4" stopOpacity="0.12" /></linearGradient>
+          <filter id="glow" x="-5%" y="-40%" width="110%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+        </defs>
+        {[0.25, 0.5, 0.75].map((f) => <line key={f} x1={0} x2={w} y1={h * f} y2={h * f} stroke="#26254a" strokeWidth="1" vectorEffect="non-scaling-stroke" />)}
+        {series.map((b, i) => {
+          const bh = (b.preconf / maxTps) * (h - pad);
+          return <rect key={b.t} x={i * bw + 0.6} y={h - bh} width={Math.max(0.8, bw - 1.2)} height={bh} fill="url(#bar)" />;
+        })}
+        {segs.map((d, i) => <path key={i} d={d} fill="none" stroke="#8ec2ff" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" filter="url(#glow)" />)}
       </svg>
       <span className="lbl tl">{`${maxTps} tx/s`}</span>
       <span className="lbl tr">{`${maxMs.toFixed(0)} ms`}</span>
     </div>
   );
+}
+
+/** Catmull-Rom → cubic Bézier path through the points. */
+function smooth(p: { x: number; y: number }[]): string {
+  let d = `M${p[0].x.toFixed(1)},${p[0].y.toFixed(1)}`;
+  for (let i = 0; i < p.length - 1; i++) {
+    const p0 = p[i - 1] ?? p[i];
+    const p1 = p[i];
+    const p2 = p[i + 1];
+    const p3 = p[i + 2] ?? p2;
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
 }
 
 function Histogram({ bins }: { bins: Snapshot['latency']['histogram'] }) {
