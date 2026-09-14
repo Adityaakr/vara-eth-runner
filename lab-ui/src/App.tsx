@@ -30,7 +30,6 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
   const [controls, setControls] = useState(false);
   const [session, setSession] = useState<PasskeySession | null>(null);
   const stuck = snap.records.filter((r) => !r.error && r.tCommitted === undefined && snap.now - r.submittedAt > STUCK_AFTER_MS).length;
-  const live = !snap.preconfError && stuck === 0;
   const pre = snap.latency.preconf;
   const safeDepth = snap.node.quarantine + 1;
   const gap = Number(snap.preconf.seq) - Number(snap.committed.seq);
