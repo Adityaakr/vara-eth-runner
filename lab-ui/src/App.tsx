@@ -140,23 +140,6 @@ function Band({ series, network, latency }: { series: Snapshot['throughput']['se
   );
 }
 
-/** Catmull-Rom → cubic Bézier path through the points. */
-function smooth(p: { x: number; y: number }[]): string {
-  let d = `M${p[0].x.toFixed(1)},${p[0].y.toFixed(1)}`;
-  for (let i = 0; i < p.length - 1; i++) {
-    const p0 = p[i - 1] ?? p[i];
-    const p1 = p[i];
-    const p2 = p[i + 1];
-    const p3 = p[i + 2] ?? p2;
-    const c1x = p1.x + (p2.x - p0.x) / 6;
-    const c1y = p1.y + (p2.y - p0.y) / 6;
-    const c2x = p2.x - (p3.x - p1.x) / 6;
-    const c2y = p2.y - (p3.y - p1.y) / 6;
-    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-  }
-  return d;
-}
-
 function Histogram({ bins }: { bins: Snapshot['latency']['histogram'] }) {
   const total = bins.reduce((a, b) => a + b.count, 0);
   const max = Math.max(1, ...bins.map((b) => b.count));
