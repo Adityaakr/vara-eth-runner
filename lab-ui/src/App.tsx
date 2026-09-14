@@ -198,7 +198,7 @@ function TxTable({ records, mine }: { records: WriteRecord[]; mine?: string }) {
   const scale = Math.max(50, ...rows.map((r) => preconfOf(r) ?? 0));
   return (
     <table>
-      <thead><tr><th>Time</th><th>Transaction</th><th>Account</th><th>Call</th><th className="r">Pre-confirmation</th><th className="r">Settlement</th></tr></thead>
+      <thead><tr><th>Time</th><th>Transaction</th><th>Account</th><th>Call</th><th className="r">Pre-confirmation</th></tr></thead>
       <tbody>
         {rows.map((r) => {
           const k = keyOf(r);
@@ -211,7 +211,6 @@ function TxTable({ records, mine }: { records: WriteRecord[]; mine?: string }) {
               <td>{r.path === 'l1' ? <span className="tag">Ethereum tx</span> : r.signer === 'passkey' ? <span className="tag mint">Passkey</span> : <span className="mono dim2">{short(r.signerAddress)}</span>}</td>
               <td className="mono">{r.label.replace('place ', 'Book.place ')}{r.orderId ? <span className="dim">{` · #${r.orderId}`}</span> : null}{r.error ? <span className="tag red" title={r.error} style={{ marginLeft: 8 }}>rejected</span> : null}</td>
               <td className="r">{r.error ? <span className="dim">—</span> : r.path === 'l1' ? <span className="dim2">none · mined only</span> : <span className={`lat ${lat !== undefined && lat >= 100 ? 'slow' : ''}`}><i style={{ width: `${Math.max(2, ((lat ?? 0) / scale) * 90)}px` }} /><b className="mono">{`${ms0(lat)} ms`}</b></span>}</td>
-              <td className="r mono dim2">{r.tCommitted !== undefined ? `block ${r.committedBlock}` : r.error ? '—' : 'pending'}</td>
             </tr>
           );
         })}
