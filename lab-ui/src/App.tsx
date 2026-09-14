@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLab } from './useLab';
 import { createPasskey, forgetPasskey, passkeysSupported, rememberedCredential, signInWithPasskey, signInjectedHash, type PasskeySession } from './passkey';
-import type { BookView, Order, Snapshot, WriteRecord } from './types';
+import type { Snapshot, WriteRecord } from './types';
 
 const STUCK_AFTER_MS = 15_000;
 const ms0 = (x?: number | null, d = 0) => (x === undefined || x === null ? '—' : x.toFixed(d));
@@ -16,7 +16,7 @@ export default function App() {
   if (!lab.snap) {
     return (
       <div>
-        <div className="mast"><div className="mark"><img src="/vara-eth-logo.svg" alt="Vara.eth" />VARA.ETH <span>Live execution telemetry · signed in milliseconds, settled on Ethereum</span></div><div className="meta"><span className="chip off"><i />{lab.status === 'open' ? 'connecting' : 'server offline'}</span></div></div>
+        <div className="mast"><div className="mark"><img src="/vara-eth-logo.svg" alt="Vara.eth" />VARA.ETH <span>Executed before the next block · settled by Ethereum · measured, not promised</span></div><div className="meta"><span className="chip off"><i />{lab.status === 'open' ? 'connecting' : 'server offline'}</span></div></div>
         <div className="page"><p className="note">Start the telemetry server: <code>cd lab-server && npm run serve</code></p></div>
       </div>
     );
@@ -36,7 +36,7 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
   return (
     <div>
       <div className="mast">
-        <div className="mark"><img src="/vara-eth-logo.svg" alt="Vara.eth" />VARA.ETH <span>Live execution telemetry · signed in milliseconds, settled on Ethereum</span></div>
+        <div className="mark"><img src="/vara-eth-logo.svg" alt="Vara.eth" />VARA.ETH <span>Executed before the next block · settled by Ethereum · measured, not promised</span></div>
         <div className="meta">
           <button className="btn line" onClick={() => setControls(true)}>Controls</button>
           <button className="btn" onClick={() => setWallet(true)}>{session ? `Wallet · ${session.address.slice(0, 6)}…${session.address.slice(-4)}` : 'Wallet'}</button>
