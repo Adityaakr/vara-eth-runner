@@ -112,26 +112,39 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
 }
 
 function Band({ series }: { series: Snapshot['throughput']['series'] }) {
-  const w = 1000;
-  const h = 100;
   const tps = series.map((b) => b.preconf);
   const sorted = [...tps].sort((a, b) => a - b);
   // Scale to the steady traffic so the band reads as a solid mass; surges clip at the top.
   const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
   const maxTps = Math.max(6, p95 * 1.1);
-  const bw = w / series.length;
-  const layers = ['#7dffe0', '#3dffcf', '#00f0b8', '#00c896', '#009e78', '#0a7a60', '#0e5a48', '#123f35'];
+  const count = series.length;
+  const lastT = series[count - 1]?.t ?? 0;
+  // Glide: shift the whole strip left by the fraction of the current second that has elapsed, so a
+  // new bucket arriving on the right looks like continuous motion rather than a one-second step.
+  const [frac, setFrac] = useState(0);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let raf = 0;
+    const loop = () => {
+      setFrac(Math.min(1, (Date.now() - lastT) / 1000));
+      raf = window.requestAnimationFrame(loop);
+    };
+    raf = window.requestAnimationFrame(loop);
+    return () => window.cancelAnimationFrame(raf);
+  }, [lastT]);
+  const barW = 100 / count;
   return (
     <div className="band">
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="bandfill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={h}>
-            {layers.map((c, i) => [<stop key={`a${i}`} offset={i / layers.length} stopColor={c} />, <stop key={`b${i}`} offset={(i + 1) / layers.length} stopColor={c} />])}
-          </linearGradient>
-        </defs>
-        {series.map((b, i) => { const bh = Math.max(0, Math.min(1, b.preconf / maxTps) * h); return bh > 0 ? <rect key={b.t} x={i * bw} y={h - bh} width={bw + 0.3} height={bh} fill="url(#bandfill)" /> : null; })}
-        <line x1={0} x2={w} y1={h} y2={h} stroke="#34335c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-      </svg>
+      <div className="band-clip">
+        <div className="band-strip" style={{ width: `${100 + barW}%`, transform: `translateX(${-frac * barW}%)` }}>
+          {series.map((b) => (
+            <div key={b.t} className="bar" style={{ height: `${Math.min(1, b.preconf / maxTps) * 100}%` }} />
+          ))}
+          <div className="bar ghost" />
+        </div>
+        <div className="band-base" />
+        <div className="band-cursor" />
+      </div>
     </div>
   );
 }
