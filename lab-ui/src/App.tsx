@@ -133,17 +133,25 @@ function Band({ series }: { series: Snapshot['throughput']['series'] }) {
     return () => window.cancelAnimationFrame(raf);
   }, [lastT]);
   const barW = 100 / count;
+  const heights = series.map((b) => Math.min(1, b.preconf / maxTps));
+  // Crest line through the bar tops (SVG in the same scrolling strip); y in a 0–100 box.
+  const crest = heights.map((h, i) => `${((i + 0.5) * barW).toFixed(2)},${(100 - h * 100).toFixed(2)}`).join(' ');
   return (
     <div className="band">
       <div className="band-clip">
+        <div className="band-glow" />
+        <div className="band-guides"><i /><i /><i /></div>
         <div className="band-strip" style={{ width: `${100 + barW}%`, transform: `translateX(${-frac * barW}%)` }}>
-          {series.map((b) => (
-            <div key={b.t} className="bar" style={{ height: `${Math.min(1, b.preconf / maxTps) * 100}%` }} />
+          {series.map((b, i) => (
+            <div key={b.t} className={`bar ${i === count - 1 ? 'live' : ''}`} style={{ height: `${heights[i] * 100}%` }} />
           ))}
           <div className="bar ghost" />
+          <svg className="crest" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: `${(100 * 100) / (100 + barW)}%` }}>
+            <polyline points={crest} fill="none" stroke="#b5ffe9" strokeWidth="1.4" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+          </svg>
         </div>
         <div className="band-base" />
-        <div className="band-cursor" />
+        <div className="band-edge"><i /></div>
       </div>
     </div>
   );

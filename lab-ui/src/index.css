@@ -21,13 +21,21 @@ html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: v
 .btn.red { background: transparent; color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
 .btn:disabled { opacity: .4; cursor: default; }
 .page { max-width: 1280px; margin: 0 auto; padding: 24px 28px 90px; }
-.band { margin: 0 0 14px; }
-.band-clip { position: relative; height: 120px; overflow: hidden; }
-.band-strip { position: absolute; left: 0; bottom: 0; height: 100%; display: flex; align-items: flex-end; will-change: transform; }
-.band-strip .bar { flex: 1 0 0; min-width: 0; height: 0; transition: height .35s cubic-bezier(.2,.7,.2,1); background-image: linear-gradient(180deg, #7dffe0 0 12.5%, #3dffcf 12.5% 25%, #00f0b8 25% 37.5%, #00c896 37.5% 50%, #009e78 50% 62.5%, #0a7a60 62.5% 75%, #0e5a48 75% 87.5%, #123f35 87.5% 100%); background-size: 100% 120px; background-position: bottom; background-attachment: local; box-shadow: inset -0.5px 0 0 rgba(0,0,0,.35); }
+.band { margin: 0 0 18px; }
+.band-clip { position: relative; height: 132px; overflow: hidden; border-radius: 3px; background: linear-gradient(180deg, rgba(0,255,196,.03), transparent 60%); }
+.band-glow { position: absolute; right: -60px; top: -40px; width: 260px; height: 220px; background: radial-gradient(closest-side, rgba(0,255,196,.16), transparent); pointer-events: none; }
+.band-guides { position: absolute; inset: 0 0 20px 0; display: flex; flex-direction: column; justify-content: space-evenly; pointer-events: none; }
+.band-guides i { display: block; height: 1px; background: linear-gradient(90deg, transparent, var(--rule2) 20%, var(--rule2) 80%, transparent); opacity: .7; }
+.band-strip { position: absolute; left: 0; bottom: 20px; height: calc(100% - 20px); display: flex; align-items: flex-end; will-change: transform; -webkit-box-reflect: below 1px linear-gradient(transparent 55%, rgba(0,0,0,.35)); }
+.band-strip .bar { flex: 1 0 0; min-width: 0; height: 0; transition: height .45s cubic-bezier(.2,.8,.2,1); background-image: linear-gradient(180deg, #8dffe6 0 12.5%, #3dffcf 12.5% 25%, #00f0b8 25% 37.5%, #00c896 37.5% 50%, #009e78 50% 62.5%, #0a7a60 62.5% 75%, #0e5a48 75% 87.5%, #123f35 87.5% 100%); background-size: 100% 112px; background-position: bottom; background-attachment: local; box-shadow: inset -0.5px 0 0 rgba(0,0,0,.35); }
+.band-strip .bar.live { filter: brightness(1.25); box-shadow: inset -0.5px 0 0 rgba(0,0,0,.35), 0 0 14px rgba(0,255,196,.45); }
 .band-strip .bar.ghost { background: transparent; box-shadow: none; }
-.band-base { position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--rule2); }
-.band-cursor { position: absolute; right: 0; top: 0; bottom: 0; width: 1px; background: linear-gradient(180deg, transparent, var(--mint) 60%, var(--mint)); opacity: .7; }
+.band-strip .crest { position: absolute; left: 0; top: 0; height: 100%; pointer-events: none; filter: drop-shadow(0 0 6px rgba(0,255,196,.75)); opacity: .9; }
+.band-strip .crest polyline { transition: points .45s; }
+.band-base { position: absolute; left: 0; right: 0; bottom: 20px; height: 1px; background: var(--rule2); }
+.band-edge { position: absolute; right: 0; top: 0; bottom: 20px; width: 1px; background: linear-gradient(180deg, transparent, var(--mint)); }
+.band-edge i { position: absolute; right: -4px; bottom: -4px; width: 9px; height: 9px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 10px var(--mint); animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.6); opacity: .45; } }
 .tiles { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--rule); border-radius: 3px; background: var(--bg2); }
 .tile { padding: 12px 16px 11px; border-left: 1px solid var(--rule); min-width: 0; }
 .tile:first-child { border-left: 0; }
