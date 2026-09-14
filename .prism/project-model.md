@@ -55,6 +55,8 @@
 
 - Recycle trigger changed (2026-09-14): latency creep could not distinguish queueing under load from store bloat and looped at 300 tx/s. Now: scheduled every LAB_RECYCLE_MINUTES (30) or when the node's tmp store exceeds LAB_RECYCLE_STORE_GB (8), never during a load test.
 
+- MAX THROUGHPUT (2026-09-14): pre-signed fire-and-forget to 16 `counter` programs → validator executes ~800/s peak, 500–600/s sustained for few-thousand bursts, 358/s when the mempool (~10k) is saturated (9,396-tx MB). Client signing 290/s per process was the live-path cap. Executable balance: 1,000 WVARA ≈ 6k pings (`InsufficientBalanceForInjectedMessages`); use 25k WVARA for load instances. Reference block must be < 32 blocks old at submission; `send()` rejections are objects (`{Reject:{reason}}`). Store recycle fired mid-run at 8.3 GB; pause recycling for benchmarks.
+
 ## Decision log
 - 2026-09-14 G0: order book app; both write paths; no commits; Vite+React+viem UI, Node lab-server engine.
 

@@ -44,3 +44,29 @@ issuing signed promises in milliseconds while nothing settles again until the no
 At 60 tx/s across four instances for 3.5 minutes: 13,600 transactions, zero failures, median rising from 24 ms to
 51 ms as the unsettled backlog grew (each order emits two events; settlement absorbs ~120 events per block).
 At 20 tx/s for 4 minutes: median 12 → 23 ms.
+
+## Maximum executed throughput on this machine (2026-09-14, fire-and-forget probe)
+
+Method: `counter` program (one u64 increment, no events), transactions pre-signed, then submitted with
+`injected_sendTransaction` (no per-tx subscription); executed/s read from the programs' own counters
+(`lab-server/src/fire-cli.ts`, `sample-cli.ts`).
+
+| Setup | Submit rate | Executed/s (avg over drain) | Best 1 s window | Node CPU |
+|---|---|---|---|---|
+| 1 process, 1 program, 2,000 tx | 30,700/s | 570 | 766 | ~97 % of one core |
+| 1 process, 4 programs, 4,000 tx | 23,400/s | 517–596 | 639–767 | ~97 % |
+| 2 processes, 16 programs, 6,000 tx | — | ~1,360 aggregate (two overlapping samplers) | 860 | — |
+| 4 processes, 16 programs, 12,000 tx | 8,000/s each | 358 sustained over 25 s (mempool saturated, 9,396-tx micro-block) | 800 | max 270 % |
+
+Findings:
+- The RPC accepts ~30k submissions/s and the mempool holds ~10k (`mempool at capacity` beyond that).
+- JavaScript signing is ~290 sign/s per process; this capped the earlier live path, not the validator.
+- The validator executes ~1.3–2 ms per transaction; peaks ~800 executed/s, sustained 500–600/s for
+  bursts of a few thousand. Huge micro-blocks (9k+ tx) execute slower per tx than medium ones.
+- Execution parallelism across programs is limited (CPU peaks at ~2.7 cores of 10).
+- Each execution is paid from the program's executable balance; 1,000 WVARA covered ~6k pings.
+  Load tests need 25,000 WVARA per instance.
+- Transactions must reference an Ethereum block within the last 32; pre-sign right before firing.
+
+50k–100k tx/s is not reachable on one laptop with this node version. It would require a validator
+set with parallel execution across many programs and machines, and a node tuned for it.
