@@ -68,7 +68,6 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
           </table>
         </div>
 
-        <p className="note dim">{`Program instance ${snap.mirror} · single local validator on one machine; figures are measured, not quoted.`}</p>
       </div>
       {wallet && <Wallet session={session} setSession={setSession} request={request} onClose={() => setWallet(false)} records={snap.records} ledger={snap.ledger} />}
       {controls && (
