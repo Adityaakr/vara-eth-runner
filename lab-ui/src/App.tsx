@@ -58,7 +58,7 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
           <div className="tile"><div className="k">P95</div><div className="v">{ms0(pre?.p95)}<u>ms</u></div><div className="s">{pre ? `max ${ms0(pre.max)}` : '—'}</div></div>
           <div className="tile"><div className="k">Fastest</div><div className="v mint">{ms0(snap.totals.allTimeMinMs, 1)}<u>ms</u></div><div className="s">since start</div></div>
           <div className="tile"><div className="k">Pre-confirmed tx/sec</div><div className="v">{n(snap.throughput.lastSecond)}</div><div className="s">{`peak ${n(snap.throughput.peak)}`}</div></div>
-          <div className="tile"><div className="k">Total txs</div><div className="v">{n(snap.totals.txs)}</div><div className="s">{`${snap.totals.failed} failed`}</div></div>
+          <div className="tile"><div className="k">Total txs</div><div className="v">{n(snap.totals.txs)}</div><div className="s">{`${n(snap.totals.preconfirmed)} pre-confirmed`}</div></div>
         </div>
 
         <Toolbar send={send} snap={snap} />
