@@ -119,19 +119,24 @@ function Band({ snap }: { snap: Snapshot }) {
     return () => window.cancelAnimationFrame(raf);
   }, []);
   // Light smoothing (3-bucket weighted average) keeps the crest textured without single-bucket spikes.
-  const smoothed = counts.map((c, i) => (0.25 * (counts[i - 1] ?? c) + 0.5 * c + 0.25 * (counts[i + 1] ?? c)));
+  // Until the window has filled (after a restart), stretch what exists across the full width instead
+  // of leaving three minutes of empty space; keep at least 40 buckets so bars stay slim.
+  const firstNonZero = counts.findIndex((c) => c > 0);
+  const from = firstNonZero < 0 ? 0 : Math.min(firstNonZero, Math.max(0, counts.length - 40));
+  const visible = counts.slice(from);
+  const smoothed = visible.map((c, i) => (0.25 * (visible[i - 1] ?? c) + 0.5 * c + 0.25 * (visible[i + 1] ?? c)));
   const sorted = [...smoothed].sort((a, b) => a - b);
   const p98 = sorted[Math.floor(sorted.length * 0.98)] ?? 0;
   const maxV = Math.max(3, p98 * 1.08);
-  const n0 = counts.length;
+  const n0 = visible.length;
   const barW = 100 / n0;
   // The last bucket is still filling; the strip shifts left by the elapsed fraction of it.
-  const elapsed = Math.min(1, Math.max(0, (now - (start + (n0 - 1) * stepMs)) / stepMs));
+  const elapsed = Math.min(1, Math.max(0, (now - (start + (counts.length - 1) * stepMs)) / stepMs));
   return (
     <div className="band">
       <div className="band-clip">
         <div className="band-strip" style={{ width: `${100 + barW}%`, transform: `translateX(${-elapsed * barW}%)` }}>
-          {smoothed.map((v, i) => <div key={start + i * stepMs} className="bar" style={{ height: `${Math.min(1, v / maxV) * 100}%` }} />)}
+          {smoothed.map((v, i) => <div key={start + (from + i) * stepMs} className="bar" style={{ height: `${Math.min(1, v / maxV) * 100}%` }} />)}
           <div className="bar ghost" />
         </div>
       </div>
