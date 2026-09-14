@@ -49,13 +49,16 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
         {snap.preconfError && <div className="alert">The validator is not answering state queries · {snap.preconfError.slice(0, 120)}</div>}
         {stuck > 0 && <div className="alert">{`${stuck} pre-confirmed transaction${stuck > 1 ? 's have' : ' has'} not settled on Ethereum for over ${STUCK_AFTER_MS / 1000} s. The validator continues to pre-confirm but is no longer committing, the signature of a reorg deeper than its anchor. Restart with run/start-node.sh.`}</div>}
 
-        <div className="ribbon">
-          <div className="kpi hero"><div className="k">Pre-confirmation · median</div><div className="v mint">{ms0(pre?.p50)}<u>ms</u></div><div className="s">{pre ? `n = ${n(pre.count)} recent` : 'awaiting traffic'}</div></div>
-          <div className="kpi hero"><div className="k">Pre-confirmation · p95</div><div className="v">{ms0(pre?.p95)}<u>ms</u></div><div className="s">{pre ? `p99 proxy: max ${ms0(pre.max)} ms` : ''}</div></div>
-          <div className="kpi hero"><div className="k">Fastest observed</div><div className="v mint">{ms0(snap.totals.allTimeMinMs, 1)}<u>ms</u></div><div className="s">since server start</div></div>
-          <div className="kpi"><div className="k">Throughput</div><div className="v">{n(snap.throughput.lastSecond)}<u>tx/s</u></div><div className="s">{`peak ${n(snap.throughput.peak)} tx/s in the last 3 min`}</div></div>
-          <div className="kpi"><div className="k">Transactions</div><div className="v">{n(snap.totals.txs)}</div><div className="s">{`${n(snap.totals.preconfirmed)} pre-confirmed · ${snap.totals.failed} rejected`}</div></div>
-          <div className="kpi"><div className="k">Settled on Ethereum</div><div className="v">{n(snap.totals.committed)}</div><div className="s">{`${n(snap.totals.pending)} awaiting settlement`}</div></div>
+        <div className="stats">
+          <div className="hero">
+            <div className="v">{ms0(pre?.p50)}<u>ms</u></div>
+            <div className="k">Pre-confirmation · median</div>
+            <div className="s">{pre ? `submission → validator-signed result · n = ${n(pre.count)}` : 'awaiting traffic'}</div>
+          </div>
+          <div className="stat"><div className="k">p95</div><div className="v">{ms0(pre?.p95)}<u>ms</u></div><div className="s">{pre ? `max ${ms0(pre.max)} ms` : ''}</div></div>
+          <div className="stat"><div className="k">Fastest</div><div className="v mint">{ms0(snap.totals.allTimeMinMs, 1)}<u>ms</u></div><div className="s">since start</div></div>
+          <div className="stat"><div className="k">Throughput</div><div className="v">{n(snap.throughput.lastSecond)}<u>tx/s</u></div><div className="s">{`peak ${n(snap.throughput.peak)} · 3 min`}</div></div>
+          <div className="stat"><div className="k">Transactions</div><div className="v">{n(snap.totals.txs)}</div><div className="s">{`${snap.totals.failed} rejected`}</div></div>
         </div>
 
         <Toolbar send={send} snap={snap} />
