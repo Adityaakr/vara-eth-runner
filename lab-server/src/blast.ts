@@ -45,9 +45,13 @@ export async function blast(engines: LabEngine[], opts: BlastOptions, onRecord?:
       if (i >= opts.total) return;
       const idx = (w + i) % engines.length;
       const engine = engines[idx];
-      const rec = await engine.placeInjected(sideCounter[idx]++ % 2 === 0 ? SIDE_BID : SIDE_ASK, price, 1n);
-      records.push(rec);
-      onRecord?.(rec);
+      try {
+        const rec = await engine.placeInjected(sideCounter[idx]++ % 2 === 0 ? SIDE_BID : SIDE_ASK, price, 1n);
+        records.push(rec);
+        onRecord?.(rec);
+      } catch (err) {
+        console.error('blast worker error', err);
+      }
     }
   };
   await Promise.all(Array.from({ length: opts.concurrency }, (_, w) => worker(w)));

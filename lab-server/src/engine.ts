@@ -77,8 +77,17 @@ export class LabEngine {
 
   /** Injected transaction straight to the validator; resolves when the signed promise arrives. */
   async placeInjected(side: number, price: bigint, qty: bigint): Promise<WriteRecord> {
-    const prepared = await this.prepareInjected(side, price, qty);
-    await prepared.tx.sign();
+    let prepared: PreparedInjected;
+    try {
+      prepared = await this.prepareInjected(side, price, qty);
+      await prepared.tx.sign();
+    } catch (err) {
+      // e.g. the stack was recycled mid-run and the anchor block vanished: one failed record, not a crash
+      const payload = this.codec.encodePlace(side, price, qty);
+      const rec = this.newRecord('injected', `place ${sideLabel(side)} ${qty}@${price}`, payload);
+      rec.error = `prepare failed: ${shortError(err)}`;
+      return rec;
+    }
     return this.sendPrepared(prepared, 'anvil', this.chain.sender.address);
   }
 
@@ -112,7 +121,7 @@ export class LabEngine {
       // bound the caller would wait forever and stall every loop behind it.
       receipt = await withTimeout(tx.sendAndWaitForReceipt(), RECEIPT_TIMEOUT_MS, `no validator receipt within ${RECEIPT_TIMEOUT_MS / 1000} s`);
     } catch (err) {
-      rec.error = `send failed: ${err instanceof Error ? err.message : String(err)}`;
+      rec.error = `send failed: ${shortError(err)}`;
       return rec;
     }
     rec.tPreconf = performance.now();
@@ -255,6 +264,11 @@ export class LabEngine {
     return rec;
   }
 
+}
+
+function shortError(err: unknown): string {
+  const e = err as { shortMessage?: string; message?: string };
+  return (e?.shortMessage ?? e?.message ?? String(err)).split('\n')[0].slice(0, 160);
 }
 
 /** Error replies carry the panic message as a plain string payload (gstd-panic-message). */

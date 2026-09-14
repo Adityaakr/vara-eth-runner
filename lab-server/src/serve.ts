@@ -88,6 +88,7 @@ async function main() {
     console.log(`recycle: ${reason}`);
     try {
       setAutopilot(0);
+      blastChild?.kill('SIGTERM');
       engine.stop();
       await chain.disconnect().catch(() => undefined);
       await restartNodeAsync(nodeSettings().quarantine);
@@ -151,6 +152,7 @@ async function main() {
   let lastPreconf = await engine.preconfBook();
   let preconfError: string | null = null;
   let blastState: { running: boolean; last: Omit<BlastResult, 'records'> | null } = { running: false, last: null };
+  let blastChild: ChildProcess | null = null;
   const blockMeta = new Map<bigint, { hash: string; timestamp: number }>();
   const prepared = new Map<string, { p: PreparedInjected; at: number }>();
   let prepSeq = 0;
@@ -318,18 +320,20 @@ async function main() {
       const rec = await engine.sendPrepared(entry.p, 'passkey', address);
       return { type: 'submitted', prepId: cmd.prepId, orderId: rec.orderId?.toString() ?? null, preconfMs: rec.tPreconf !== undefined ? rec.tPreconf - rec.tSubmit : null, error: rec.error ?? null };
     } else if (cmd.type === 'blast') {
-      if (blastState.running) throw new Error('a blast is already running');
+      if (blastState.running) throw new Error('a load test is already running');
+      if (validator.recycling) throw new Error('the validator is being recycled; try again in a moment');
       const total = Math.min(5000, Math.max(1, Number(cmd.total) || 0));
       const concurrency = Math.min(256, Math.max(1, Number(cmd.concurrency) || 0));
       blastState = { running: true, last: blastState.last };
       const t0 = performance.now();
       try {
-        const summary = await runBlast(total, concurrency, BLAST_SENDERS, ingest);
+        const summary = await runBlast(total, concurrency, BLAST_SENDERS, ingest, (c) => (blastChild = c));
         blastState = { running: false, last: summary };
       } catch (err) {
         blastState = { running: false, last: blastState.last };
         throw err;
       } finally {
+        blastChild = null;
         console.log(`blast ${total}@${concurrency} took ${(performance.now() - t0).toFixed(0)} ms`);
       }
     }
@@ -337,10 +341,11 @@ async function main() {
 }
 
 /** Run blast-cli.ts as a child process and stream its records back. */
-function runBlast(total: number, concurrency: number, senders: number, onRecord: (r: WriteRecord) => void): Promise<Omit<BlastResult, 'records'>> {
+function runBlast(total: number, concurrency: number, senders: number, onRecord: (r: WriteRecord) => void, onSpawn?: (c: ChildProcess) => void): Promise<Omit<BlastResult, 'records'>> {
   const cli = resolve(dirname(fileURLToPath(import.meta.url)), 'blast-cli.ts');
   return new Promise((resolvePromise, reject) => {
     const child = spawn(process.execPath, [tsxBin(), cli, String(total), String(concurrency), String(senders), '--json'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    onSpawn?.(child);
     let summary: Omit<BlastResult, 'records'> | null = null;
     let stderr = '';
     child.stderr.on('data', (d) => (stderr += String(d)));
@@ -353,7 +358,11 @@ function runBlast(total: number, concurrency: number, senders: number, onRecord:
         /* not JSON */
       }
     });
-    child.on('exit', (code) => (code === 0 && summary ? resolvePromise(summary) : reject(new Error(`blast child exited ${code}: ${stderr.slice(-300)}`))));
+    child.on('exit', (code, signal) => {
+      if (code === 0 && summary) resolvePromise(summary);
+      else if (signal) reject(new Error('load test stopped because the validator was recycled'));
+      else reject(new Error(`load test failed: ${stderr.split('\n').find((l) => l.includes('shortMessage') || l.includes('Error'))?.slice(0, 160) ?? `exit ${code}`}`));
+    });
   });
 }
 
