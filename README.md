@@ -90,6 +90,7 @@ Select on the page or set `LAB_NET_PROFILE`, `LAB_CALIBRATE_URL`.
 - Latency is one clock in one process: `tSubmit` after signing, `tPreconf` on the validator-signed receipt, `tCommitted` when the log is seen on Ethereum.
 - Passkeys: the PRF secret seeds a secp256k1 key in the browser via HKDF; the key never leaves it.
 - The dev node persists every micro-block to an unpruned `--tmp` store (64 GB in 40 min at 25 tx/s) and slows as it grows; the server recycles it every 10 min or on latency creep and says so on the page.
+- Ethexe allows 4 outgoing messages per execution, so the program caps fills at 3 per order and rests the remainder.
 - Single local validator; the order book is a lab toy. Pitfalls and verified node behaviour: [`.prism/project-model.md`](.prism/project-model.md).
 
 MIT for lab code; `gear` and the vendored `@vara-eth/api` are GPL-3.0.

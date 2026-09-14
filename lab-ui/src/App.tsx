@@ -205,7 +205,7 @@ function TxTable({ records, mine }: { records: WriteRecord[]; mine?: string }) {
               <td className="mono dim2">{clock(r.submittedAt)}</td>
               <td className="mono dim2">{short(r.txHash ?? r.messageId)}</td>
               <td>{r.path === 'l1' ? <span className="tag">Ethereum tx</span> : r.signer === 'passkey' ? <span className="tag mint">Passkey</span> : <span className="mono dim2">{short(r.signerAddress)}</span>}</td>
-              <td className="mono">{r.label.replace('place ', 'Book.place ')}{r.orderId ? <span className="dim">{` · #${r.orderId}`}</span> : null}{r.error ? <span className="tag red" title={r.error} style={{ marginLeft: 8 }}>rejected</span> : null}</td>
+              <td className="mono">{r.label.startsWith('cancel') ? `Book.${r.label}` : r.label.replace('place ', 'Book.place ')}{r.orderId && !r.label.startsWith('cancel') ? <span className="dim">{` · #${r.orderId}`}</span> : null}{r.error ? <span className="tag red" title={r.error} style={{ marginLeft: 8 }}>rejected</span> : null}</td>
               <td className="r">{r.error ? <span className="dim">—</span> : r.path === 'l1' ? <span className="dim2">none · mined only</span> : <span className={`lat ${lat !== undefined && lat >= 100 ? 'slow' : ''}`}><i style={{ width: `${Math.max(2, ((lat ?? 0) / scale) * 90)}px` }} /><b className="mono">{`${ms0(lat)} ms`}</b></span>}</td>
             </tr>
           );

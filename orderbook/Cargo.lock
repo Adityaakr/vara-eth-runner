@@ -2722,6 +2722,7 @@ version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9cd0995297f19691550dde3cb36a4b01440f994a46f67beb9e3ee78714346fef"
 dependencies = [
+ "arrayvec",
  "const_format",
  "futures",
  "galloc",

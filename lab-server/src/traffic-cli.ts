@@ -17,17 +17,27 @@ const burstSize = Math.max(0, Number(process.argv[5] ?? 120));
 async function main() {
   const mirrors = (process.env.LAB_MIRRORS ?? '').split(',').filter(Boolean) as `0x${string}`[];
   const { engines } = await openEngines(senders, 9, mirrors);
-  // Realistic-looking flow: each program instance has a mid price that random-walks; bids land a
-  // little above it and asks a little below, so they still cross and the book stays bounded.
+  // Realistic-looking flow that cannot fill the book: each instance has a drifting mid price, but a
+  // new bid is never below the last ask and a new ask never above the last bid on that instance, so
+  // every order crosses the previous opposite one. Only remainders rest, and the next order clears them.
   const mids = engines.map(() => 2_000_000 + Math.floor(Math.random() * 500_000));
+  const lastAsk = engines.map((_, i) => mids[i]);
+  const lastBid = engines.map((_, i) => mids[i]);
   const nextOrder = (idx: number): { side: number; price: bigint; qty: bigint } => {
-    mids[idx] += Math.round((Math.random() - 0.5) * 6);
+    mids[idx] += Math.round((Math.random() - 0.5) * 2);
     const side = nextSide(idx);
-    const skew = Math.floor(Math.random() * 4);
-    const price = BigInt(side === SIDE_BID ? mids[idx] + skew : mids[idx] - skew);
+    const skew = Math.floor(Math.random() * 3);
+    let price: number;
+    if (side === SIDE_BID) {
+      price = Math.max(mids[idx] + skew, lastAsk[idx]);
+      lastBid[idx] = price;
+    } else {
+      price = Math.min(mids[idx] - skew, lastBid[idx]);
+      lastAsk[idx] = price;
+    }
     const r = Math.random();
     const qty = BigInt(r < 0.6 ? 1 + Math.floor(Math.random() * 5) : r < 0.9 ? 5 + Math.floor(Math.random() * 20) : 25 + Math.floor(Math.random() * 100));
-    return { side, price, qty };
+    return { side, price: BigInt(Math.max(1, price)), qty };
   };
   let i = 0;
   let inFlight = 0;
@@ -87,6 +97,27 @@ async function main() {
       pump();
     }, burstEverySec * 1000);
   }
+  // Housekeeping: every few seconds, each instance cancels its oldest resting orders once the book
+  // grows past a threshold. Cancels are real transactions on the tape and keep the book bounded.
+  const CANCEL_ABOVE = 24;
+  const CANCEL_DOWN_TO = 12;
+  setInterval(() => {
+    engines.forEach((engine, idx) => {
+      engine
+        .preconfBook()
+        .then(async (view) => {
+          const resting = [...view.bids, ...view.asks].sort((a, b) => (a.id < b.id ? -1 : 1));
+          if (resting.length <= CANCEL_ABOVE) return;
+          for (const o of resting.slice(0, resting.length - CANCEL_DOWN_TO)) {
+            inFlight++;
+            const rec = await engine.cancelInjected(o.id).finally(() => inFlight--);
+            console.log(JSON.stringify({ record: rec }, bigintReplacer));
+          }
+          console.error(`traffic: instance ${idx} cancelled ${resting.length - CANCEL_DOWN_TO} resting orders`);
+        })
+        .catch((err) => console.error('cancel sweep failed', err));
+    });
+  }, 4_000);
   console.error(`traffic: ${rate} tx/s target, ${senders} senders, max in flight ${maxInFlight}, burst ${burstSize} every ${burstEverySec} s`);
 }
 

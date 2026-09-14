@@ -13,6 +13,11 @@ use sails_rs::prelude::*;
 pub const MAX_RESTING_PER_SIDE: usize = 256;
 /// Number of most recent fills kept for the `book` query.
 pub const MAX_RECENT_FILLS: usize = 64;
+/// Fills one `place` may perform. Every fill emits an event and ethexe allows 4 outgoing messages per
+/// execution (`MAX_OUTGOING_MESSAGES_PER_EXECUTION` in ethexe-runtime-common; the 5th fails with
+/// `OutgoingMessagesAmountLimitExceeded`). 3 fills + 1 `Placed` = 4. An order needing more fills
+/// executes these and rests the remainder, like a per-transaction match limit on a venue.
+pub const MAX_FILLS_PER_ORDER: usize = 3;
 
 pub const SIDE_BID: u32 = 0;
 pub const SIDE_ASK: u32 = 1;
@@ -273,7 +278,7 @@ fn match_against_book(
         Side::Bid => &mut state.asks,
         Side::Ask => &mut state.bids,
     };
-    while remaining > 0 {
+    while remaining > 0 && fills.len() < MAX_FILLS_PER_ORDER {
         let Some(maker) = opposite.first_mut() else { break };
         if !crosses(taker_side, taker_price, maker.price) {
             break;
@@ -449,6 +454,23 @@ mod tests {
         assert_eq!(view.asks[0].id, ask);
         assert_eq!(view.asks[0].qty, 4);
         assert!(view.recent_fills.is_empty());
+    }
+
+    #[test]
+    fn a_sweep_is_capped_per_order_and_the_remainder_rests() {
+        Syscall::with_message_source(actor(1));
+        let state = RefCell::new(BookState::default());
+        let mut svc = Book::new(&state).expose(0);
+        for i in 0..30u64 {
+            svc.place(SIDE_BID, 500 + i, 1);
+        }
+        let ask = svc.place(SIDE_ASK, 1, 200);
+        let view = svc.book();
+        assert_eq!(view.recent_fills.len(), MAX_FILLS_PER_ORDER);
+        assert_eq!(view.bids.len(), 30 - MAX_FILLS_PER_ORDER, "only the capped number of makers were consumed");
+        assert_eq!(view.asks.len(), 1);
+        assert_eq!(view.asks[0].id, ask);
+        assert_eq!(view.asks[0].qty, 200 - MAX_FILLS_PER_ORDER as u64, "remainder rests even though bids remain");
     }
 
     #[test]

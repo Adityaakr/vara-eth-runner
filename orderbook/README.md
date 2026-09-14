@@ -26,6 +26,9 @@ cargo build --release          # target/wasm32-gear/release/orderbook.opt.wasm +
 
 ## Limits by design
 
+Ethexe allows **4 outgoing messages per execution** and every eth event is one, so a single `place` performs at most
+3 fills (3 `Filled` + 1 `Placed`) and rests the remainder. Build with `gstd-panic-message` or panics read as `<unknown>`.
+
 256 resting orders per side, 64 recent fills kept. The capacity check runs before any mutation, so a rejected order never
 half-executes. `place` is free and permissionless and `cancel` owner-only, so one account can squat every slot; this is a
 lab program, not a venue.

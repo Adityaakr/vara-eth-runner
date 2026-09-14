@@ -12,7 +12,7 @@ categories.workspace = true
 
 [dependencies]
 orderbook-app.workspace = true
-sails-rs = { workspace = true, features = ["ethexe"] }
+sails-rs = { workspace = true, features = ["ethexe", "gstd-panic-message"] }
 
 [dev-dependencies]
 orderbook-app.workspace = true

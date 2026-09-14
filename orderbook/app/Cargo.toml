@@ -11,7 +11,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-sails-rs = { workspace = true, features = ["ethexe"] }
+sails-rs = { workspace = true, features = ["ethexe", "gstd-panic-message"] }
 
 [dev-dependencies]
 sails-rs = { workspace = true, features = ["ethexe", "std"] }

@@ -91,6 +91,33 @@ export class LabEngine {
     return this.sendPrepared(prepared, 'anvil', this.chain.sender.address);
   }
 
+  /** Cancel a resting order via an injected transaction; the reply is whether it was found and owned. */
+  async cancelInjected(id: bigint): Promise<WriteRecord> {
+    const payload = this.codec.encodeCancel(id);
+    const rec = this.newRecord('injected', `cancel #${id}`, payload);
+    try {
+      const tx = await this.createInjectedTx(payload);
+      const latest = await this.chain.publicClient.getBlock({ blockTag: 'latest' });
+      await tx.setReferenceBlock(latest.hash);
+      await tx.sign();
+      rec.messageId = tx.messageId;
+      rec.txHash = tx.txHash;
+      rec.ethBlock = latest.number;
+      rec.signer = 'anvil';
+      rec.signerAddress = this.chain.sender.address;
+      rec.tSubmit = performance.now();
+      const receipt = await withTimeout(tx.sendAndWaitForReceipt(), RECEIPT_TIMEOUT_MS, `no validator receipt within ${RECEIPT_TIMEOUT_MS / 1000} s`);
+      rec.tPreconf = performance.now();
+      rec.validator = receipt.address;
+      if (receipt.error !== null) rec.error = `purged: ${receipt.error}`;
+      else if (!receipt.promise.code.isSuccess) rec.error = `program error: ${panicText(receipt.promise.payload) ?? receipt.promise.code.reason}`;
+      else rec.orderId = id;
+    } catch (err) {
+      rec.error = `send failed: ${shortError(err)}`;
+    }
+    return rec;
+  }
+
   /**
    * Build and anchor an injected transaction without signing it, so an external signer (a browser
    * passkey-derived key) can sign `tx.hash` and hand the signature back via `sendPrepared`.

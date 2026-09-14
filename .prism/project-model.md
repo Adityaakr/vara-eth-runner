@@ -49,6 +49,8 @@
 - Emulator lesson (2026-09-14): independent per-frame jitter can deliver the validator's subscription ack and its first notification back to back, and the JS client drops the notification (2–3% "no receipt"). Fix: never compress spacing between frames that arrived ≤ 40 ms apart, but do not tie distant frames or positive jitter ratchets the schedule (delays grow unbounded). Direct path: 0/400 failures; emulated after fix: 0/650.
 - Recycle watch: 12 min at 12 tx/s, p50 182–192 ms throughout, scheduled recycle at 10 min took ~30 s, store 1.4 GB → reset. `LAB_REF_BLOCK_LAG` env exists but made no difference.
 
+- ETHEXE LIMIT (2026-09-14): `MAX_OUTGOING_MESSAGES_PER_EXECUTION = 4` (`ethexe/runtime/common/src/lib.rs:114`); eth events count. A `place` that fills ≥4 makers panics with `OutgoingMessagesAmountLimitExceeded` (visible only with the `gstd-panic-message` feature, otherwise "panicked with '<unknown>'"). Program now caps fills at 3 per order (`MAX_FILLS_PER_ORDER`) and rests the remainder. Traffic generator cancels oldest resting orders above 24 per instance.
+
 ## Decision log
 - 2026-09-14 G0: order book app; both write paths; no commits; Vite+React+viem UI, Node lab-server engine.
 
