@@ -212,6 +212,13 @@ async function main() {
     const histogram = edges.slice(0, -1).map((lo, i) => ({ lo, hi: edges[i + 1], count: preconfLatencies.filter((x) => x >= lo && x < edges[i + 1]).length }));
     const e2e = summarize(records.filter((r) => !r.error && r.tCommitted !== undefined).map((r) => r.tCommitted! - r.tSubmit));
     const series = throughputSeries(records, now);
+    // Per-transaction latency points for the last HISTORY_SECONDS, thinned to a bounded count.
+    const windowStart = now - HISTORY_SECONDS * 1000;
+    const rawPoints = injected
+      .map((r) => ({ t: wallOf(r, r.tPreconf)!, ms: r.tPreconf! - r.tSubmit, signer: r.signer ?? 'anvil' }))
+      .filter((p) => p.t >= windowStart);
+    const stride = Math.max(1, Math.ceil(rawPoints.length / 1800));
+    const points = rawPoints.filter((_, i) => i % stride === 0);
     const lastSecond = series[series.length - 2]; // the last complete second
     return JSON.stringify(
       {
@@ -239,6 +246,8 @@ async function main() {
         network: { profile: netem.profile.name, oneWayMs: netem.profile.oneWayMs, jitterMs: netem.profile.jitterMs, note: netem.profile.note, calibration: cal, profiles: Object.values(table).map((p) => ({ name: p.name, oneWayMs: p.oneWayMs, note: p.note })) },
         latency: { preconf: preconfLat, e2e, histogram },
         throughput: { series, lastSecond: lastSecond.preconf, peak: Math.max(...series.map((b) => b.preconf)) },
+        points,
+        windowSeconds: HISTORY_SECONDS,
         blocks: await blockRows().catch(() => []),
         records: records.slice(-40).map((r) => ({ ...r, wallPreconf: wallOf(r, r.tPreconf), wallCommitted: wallOf(r, r.tCommitted) })),
         stats: { injected: statsFor(records, 'injected'), l1: statsFor(records, 'l1') },

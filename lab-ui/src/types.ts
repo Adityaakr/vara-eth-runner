@@ -52,6 +52,8 @@ export type Snapshot = {
   network: { profile: 'local' | 'measured' | 'global'; oneWayMs: number; jitterMs: number; note: string; calibration: { target: string; rttMs: number | null }; profiles: { name: string; oneWayMs: number; note: string }[] };
   latency: { preconf: Summary; e2e: Summary; histogram: { lo: number; hi: number; count: number }[] };
   throughput: { series: Bucket[]; lastSecond: number; peak: number };
+  points: { t: number; ms: number; signer: 'anvil' | 'passkey' }[];
+  windowSeconds: number;
   blocks: BlockRow[];
   records: WriteRecord[];
   stats: { injected: PathStats; l1: PathStats };

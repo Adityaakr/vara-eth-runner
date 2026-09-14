@@ -51,7 +51,7 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
         {snap.validator.recycling && <div className="alert" style={{ borderColor: 'var(--mint)', background: 'color-mix(in srgb, var(--mint) 8%, transparent)' }}>Recycling the validator. Traffic resumes in about 20 s.</div>}
         {stuck > 0 && !snap.validator.recycling && <div className="alert">{`${stuck} pre-confirmed transaction${stuck > 1 ? 's have' : ' has'} not settled on Ethereum for over ${STUCK_AFTER_MS / 1000} s. The validator continues to pre-confirm but is no longer committing, the signature of a reorg deeper than its anchor. Restart with run/start-node.sh.`}</div>}
 
-        <Band series={snap.throughput.series} />
+        <Band snap={snap} />
 
         <div className="tiles">
           <div className="tile"><div className="k">Latest height</div><div className="v">{snap.ethHead}</div></div>
@@ -111,47 +111,75 @@ export function LabView({ snap, lastError, send, request }: { snap: Snapshot; la
   );
 }
 
-function Band({ series }: { series: Snapshot['throughput']['series'] }) {
-  const tps = series.map((b) => b.preconf);
-  const sorted = [...tps].sort((a, b) => a - b);
-  // Scale to the steady traffic so the band reads as a solid mass; surges clip at the top.
-  const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
-  const maxTps = Math.max(6, p95 * 1.1);
-  const count = series.length;
-  const lastT = series[count - 1]?.t ?? 0;
-  // Glide: shift the whole strip left by the fraction of the current second that has elapsed, so a
-  // new bucket arriving on the right looks like continuous motion rather than a one-second step.
-  const [frac, setFrac] = useState(0);
+/**
+ * Latency field: every pre-confirmed transaction is a point placed by the moment its signed result
+ * arrived (x) and how long that took (y). The strip scrolls continuously; positions are fixed per
+ * snapshot and the whole group is translated by the time elapsed since, so it is cheap to animate.
+ */
+function Band({ snap }: { snap: Snapshot }) {
+  const W = 1000;
+  const H = 100;
+  const windowMs = snap.windowSeconds * 1000;
+  const [now, setNow] = useState(snap.now);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let raf = 0;
-    const loop = () => {
-      setFrac(Math.min(1, (Date.now() - lastT) / 1000));
-      raf = window.requestAnimationFrame(loop);
-    };
+    const loop = () => { setNow(Date.now()); raf = window.requestAnimationFrame(loop); };
     raf = window.requestAnimationFrame(loop);
     return () => window.cancelAnimationFrame(raf);
-  }, [lastT]);
-  const barW = 100 / count;
-  const heights = series.map((b) => Math.min(1, b.preconf / maxTps));
-  // Crest line through the bar tops (SVG in the same scrolling strip); y in a 0–100 box.
-  const crest = heights.map((h, i) => `${((i + 0.5) * barW).toFixed(2)},${(100 - h * 100).toFixed(2)}`).join(' ');
+  }, []);
+  const pts = snap.points;
+  const sortedMs = pts.map((p) => p.ms).sort((a, b) => a - b);
+  const p95 = sortedMs[Math.floor(sortedMs.length * 0.95)] ?? 0;
+  const maxMs = Math.min(800, Math.max(300, Math.ceil((p95 * 1.25) / 50) * 50));
+  const x = (t: number) => ((t - (snap.now - windowMs)) / windowMs) * W;
+  const y = (ms: number) => H - (Math.min(ms, maxMs) / maxMs) * (H - 6) - 3;
+  const shift = ((now - snap.now) / windowMs) * W;
+  const med = snap.throughput.series.map((b) => (b.p50 === null ? null : `${x(b.t + 500).toFixed(1)},${y(b.p50).toFixed(1)}`));
+  const segs: string[] = [];
+  let cur: string[] = [];
+  for (const m of med) { if (m) cur.push(m); else if (cur.length > 1) { segs.push(cur.join(' ')); cur = []; } else cur = []; }
+  if (cur.length > 1) segs.push(cur.join(' '));
+  const guides = [100, 200, 250].filter((g) => g < maxMs);
+  const tps = snap.throughput.series;
+  const maxTps = Math.max(6, ...tps.map((b) => b.preconf));
+  const bw = W / tps.length;
   return (
-    <div className="band">
-      <div className="band-clip">
-        <div className="band-glow" />
-        <div className="band-guides"><i /><i /><i /></div>
-        <div className="band-strip" style={{ width: `${100 + barW}%`, transform: `translateX(${-frac * barW}%)` }}>
-          {series.map((b, i) => (
-            <div key={b.t} className={`bar ${i === count - 1 ? 'live' : ''}`} style={{ height: `${heights[i] * 100}%` }} />
-          ))}
-          <div className="bar ghost" />
-          <svg className="crest" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: `${(100 * 100) / (100 + barW)}%` }}>
-            <polyline points={crest} fill="none" stroke="#b5ffe9" strokeWidth="1.4" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <div className="band-base" />
-        <div className="band-edge"><i /></div>
+    <div className="field">
+      <div className="field-head">
+        <span><i className="dot mint" />pre-confirmation time per transaction</span>
+        <span><i className="dot line" />median per second</span>
+        <span className="right">{`last ${snap.windowSeconds} s · ${n(pts.length)} transactions`}</span>
+      </div>
+      <div className="field-plot">
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+          <defs>
+            <filter id="dotglow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="1.6" /></filter>
+            <linearGradient id="fieldfade" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stopColor="#0c0c1c" stopOpacity="1" /><stop offset="0.12" stopColor="#0c0c1c" stopOpacity="0" /></linearGradient>
+          </defs>
+          {guides.map((g) => <g key={g}><line x1={0} x2={W} y1={y(g)} y2={y(g)} stroke={g === 250 ? '#f2b544' : '#26254a'} strokeWidth="1" strokeDasharray={g === 250 ? '6 4' : '2 5'} vectorEffect="non-scaling-stroke" opacity={g === 250 ? 0.55 : 1} /></g>)}
+          <g transform={`translate(${-shift} 0)`}>
+            {pts.map((p, i) => {
+              const age = (now - p.t) / windowMs;
+              const slow = p.ms > 250;
+              return <circle key={i} cx={x(p.t)} cy={y(p.ms)} r={p.signer === 'passkey' ? 3.2 : 1.9} fill={slow ? '#f2b544' : p.signer === 'passkey' ? '#ffffff' : '#00ffc4'} opacity={0.25 + (1 - age) * 0.7} filter="url(#dotglow)" vectorEffect="non-scaling-stroke" />;
+            })}
+            {segs.map((d, i) => <polyline key={i} points={d} fill="none" stroke="#9cc8ff" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" opacity="0.9" />)}
+          </g>
+          <rect x={0} y={0} width={W} height={H} fill="url(#fieldfade)" pointerEvents="none" />
+        </svg>
+        {guides.map((g) => <span key={g} className={`ax ${g === 250 ? 'amber' : ''}`} style={{ top: `${(y(g) / H) * 100}%` }}>{`${g} ms`}</span>)}
+        <span className="ax top">{`${maxMs} ms`}</span>
+        <span className="ax bottom">0</span>
+        <div className="live-edge"><i /></div>
+      </div>
+      <div className="field-tps">
+        <svg viewBox={`0 0 ${W} 22`} preserveAspectRatio="none">
+          <g transform={`translate(${-shift} 0)`}>
+            {tps.map((b) => { const h = (b.preconf / maxTps) * 22; return <rect key={b.t} x={x(b.t)} y={22 - h} width={Math.max(0.8, bw - 0.8)} height={h} fill="#00c896" opacity="0.55" />; })}
+          </g>
+        </svg>
+        <span className="ax tpslbl">{`tx/s · peak ${snap.throughput.peak}`}</span>
       </div>
     </div>
   );
