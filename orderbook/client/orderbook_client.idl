@@ -1,0 +1,83 @@
+
+!@sails: 2.0.0
+
+service Book@0x92b02ab926ed8b7c {
+    events {
+        Cancelled {
+            @indexed
+            id: u64,
+            seq: u64,
+        },
+        Filled {
+            @indexed
+            taker: u64,
+            @indexed
+            maker: u64,
+            seq: u64,
+            price: u64,
+            qty: u64,
+        },
+        Placed {
+            @indexed
+            id: u64,
+            seq: u64,
+            owner: Address,
+            side: u32,
+            price: u64,
+            qty: u64,
+        },
+    }
+    functions {
+        /// Full book snapshot. SCALE only: custom DTOs are not ABI-encoded.
+        @codec: scale
+        @query
+        Book() -> BookView;
+        /// Cancel a resting order. Only the owner may cancel. Returns false if not found or not owned.
+        Cancel(id: u64) -> bool;
+        /// Place an order. Matches against the opposite side, rests any remainder. Returns the order id.
+        Place(side: u32, price: u64, qty: u64) -> u64;
+        /// Event sequence number reached by the program state.
+        @query
+        Seq() -> u64;
+    }
+    types {
+        @sol_type: address
+        struct Address(H160);
+        /// Snapshot returned by the `book` query. Bids are sorted best-first (price desc, id asc),
+        /// asks best-first (price asc, id asc).
+        struct BookView {
+            seq: u64,
+            next_id: u64,
+            bids: [Order],
+            asks: [Order],
+            recent_fills: [Fill],
+        }
+        struct Fill {
+            seq: u64,
+            taker: u64,
+            maker: u64,
+            price: u64,
+            qty: u64,
+        }
+        struct Order {
+            id: u64,
+            owner: Address,
+            side: Side,
+            price: u64,
+            qty: u64,
+        }
+        enum Side {
+            Bid,
+            Ask,
+        }
+    }
+}
+
+program OrderbookClient {
+    constructors {
+        Create();
+    }
+    services {
+        Book@0x92b02ab926ed8b7c,
+    }
+}

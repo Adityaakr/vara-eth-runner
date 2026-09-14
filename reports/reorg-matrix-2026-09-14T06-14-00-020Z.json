@@ -1,0 +1,44 @@
+[
+  {
+    "quarantine": 0,
+    "depth": 1,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "0",
+    "reorgDetectedMs": 6.616084000001138,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": 1847.640209000001
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": 1847.640209000001
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "block": "47",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "2",
+        "block": "47",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "3",
+        "block": "47",
+        "stillCommittedAtEnd": true
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 5ms",
+      "committedAfterMs": 6814.632000000001
+    },
+    "recoveredMs": 6945.041459,
+    "refusedCommitmentsLogLines": 0,
+    "notes": []
+  }
+]

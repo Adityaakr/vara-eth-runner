@@ -1,0 +1,314 @@
+// WebSocket server for the explorer UI: streams engine snapshots and executes UI commands.
+// Usage: npm run serve  (ws://127.0.0.1:8787)
+import { spawn, type ChildProcess } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
+import { WebSocketServer, type WebSocket } from 'ws';
+import type { BlastResult } from './blast.js';
+import { connectChain } from './chain.js';
+import { bigintReplacer } from './committed.js';
+import { LAB_ROOT, nodeSettings } from './config.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { LabEngine, type PreparedInjected } from './engine.js';
+import type { Hex } from 'viem';
+import { anvilReorg } from './stack.js';
+import { statsFor, summarize, type WriteRecord } from './timeline.js';
+
+const PORT = Number(process.env.LAB_WS_PORT ?? 8787);
+const BLAST_SENDERS = 4;
+const HISTORY_SECONDS = 180;
+const RECENT_MAX = 4000;
+const DEFAULT_AUTOPILOT_RATE = Number(process.env.LAB_AUTOPILOT_RATE ?? 25);
+
+type Command =
+  | { type: 'place'; path: 'injected' | 'l1'; side: number; price: string; qty: string }
+  | { type: 'reorg'; depth: number }
+  | { type: 'blast'; total: number; concurrency: number }
+  | { type: 'autopilot'; rate: number }
+  | { type: 'prepare'; side: number; price: string; qty: string }
+  | { type: 'submitSigned'; prepId: string; signature: string; address: string };
+
+/** performance.now() → wall-clock ms, using the record's own submit pair as the reference. */
+function wallOf(r: WriteRecord, t: number | undefined): number | undefined {
+  return t === undefined ? undefined : r.submittedAt + (t - r.tSubmit);
+}
+
+async function main() {
+  const chain = await connectChain(4);
+  const engine = await LabEngine.create(chain);
+  await engine.start();
+  // Blast records come from a child process (see runBlast) so signing and RPC traffic never share
+  // this server's event loop with snapshot serialization; committed attribution still happens here.
+  // Records from child processes (autopilot traffic and bursts) live in one bounded ring so the
+  // snapshot maths stays cheap; all-time totals are kept as counters.
+  const recent: WriteRecord[] = [];
+  const allTime = { txs: 0, preconfirmed: 0, failed: 0, minMs: Infinity, sumMs: 0 };
+  const ingest = (r: WriteRecord) => {
+    recent.push(r);
+    if (recent.length > RECENT_MAX) recent.splice(0, recent.length - RECENT_MAX);
+    allTime.txs++;
+    if (r.error) allTime.failed++;
+    else if (r.tPreconf !== undefined) {
+      allTime.preconfirmed++;
+      const ms = r.tPreconf - r.tSubmit;
+      allTime.minMs = Math.min(allTime.minMs, ms);
+      allTime.sumMs += ms;
+    }
+  };
+  engine.trackRecords(recent);
+  let autopilot: { child: ChildProcess | null; rate: number } = { child: null, rate: 0 };
+  const setAutopilot = (rate: number) => {
+    if (autopilot.child) {
+      autopilot.child.kill('SIGTERM');
+      autopilot = { child: null, rate: 0 };
+    }
+    if (rate <= 0) return;
+    const mirrorsFile = resolve(LAB_ROOT, 'run/mirrors.txt');
+    const mirrors = existsSync(mirrorsFile) ? readFileSync(mirrorsFile, 'utf8').split('\n').filter(Boolean).join(',') : '';
+    const child = spawn(process.execPath, [tsxBin(), resolve(dirname(fileURLToPath(import.meta.url)), 'traffic-cli.ts'), String(rate), String(BLAST_SENDERS)], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, LAB_MIRRORS: mirrors } });
+    child.stderr.on('data', (d) => process.stderr.write(`[traffic] ${d}`));
+    createInterface({ input: child.stdout }).on('line', (line) => {
+      try {
+        const msg = JSON.parse(line) as { record?: Record<string, unknown> };
+        if (msg.record) ingest(reviveRecord(msg.record));
+      } catch {
+        /* not JSON */
+      }
+    });
+    child.on('exit', (code) => {
+      if (autopilot.child === child) autopilot = { child: null, rate: 0 };
+      if (code && code !== 0) console.error(`traffic child exited ${code}`);
+    });
+    autopilot = { child, rate };
+  };
+  setAutopilot(DEFAULT_AUTOPILOT_RATE);
+  process.on('exit', () => autopilot.child?.kill('SIGTERM'));
+
+  const wss = new WebSocketServer({ host: '127.0.0.1', port: PORT });
+  console.log(`lab-server listening on ws://127.0.0.1:${PORT}; mirror ${chain.mirrorAddress}`);
+
+  let lastPreconf = await engine.preconfBook();
+  let preconfError: string | null = null;
+  let blastState: { running: boolean; last: Omit<BlastResult, 'records'> | null } = { running: false, last: null };
+  const blockMeta = new Map<bigint, { hash: string; timestamp: number }>();
+  const prepared = new Map<string, { p: PreparedInjected; at: number }>();
+  let prepSeq = 0;
+
+  const throughputSeries = (records: WriteRecord[], now: number) => {
+    const buckets = Array.from({ length: HISTORY_SECONDS }, (_, i) => ({ t: Math.floor(now / 1000) * 1000 - (HISTORY_SECONDS - 1 - i) * 1000, preconf: 0, committed: 0, latencies: [] as number[], p50: null as number | null }));
+    const first = buckets[0].t;
+    for (const r of records) {
+      const p = wallOf(r, r.tPreconf);
+      if (p !== undefined && p >= first) {
+        const b = buckets[Math.min(HISTORY_SECONDS - 1, Math.floor((p - first) / 1000))];
+        b.preconf++;
+        b.latencies.push(r.tPreconf! - r.tSubmit);
+      }
+      const c = wallOf(r, r.tCommitted);
+      if (c !== undefined && c >= first) buckets[Math.min(HISTORY_SECONDS - 1, Math.floor((c - first) / 1000))].committed++;
+    }
+    return buckets.map(({ latencies, ...b }) => ({ ...b, p50: summarize(latencies)?.p50 ?? null }));
+  };
+
+  const blockRows = async () => {
+    const counts = new Map<bigint, number>();
+    for (const o of engine.watcher.observed) if (o.event.kind !== 'Reply') counts.set(o.blockNumber, (counts.get(o.blockNumber) ?? 0) + 1);
+    const head = await chain.publicClient.getBlockNumber();
+    const rows = [];
+    for (let n = head; n > head - 20n && n >= 0n; n--) {
+      let meta = blockMeta.get(n);
+      if (!meta) {
+        const b = await chain.publicClient.getBlock({ blockNumber: n });
+        meta = { hash: b.hash, timestamp: Number(b.timestamp) };
+        blockMeta.set(n, meta);
+      }
+      rows.push({ number: n, hash: meta.hash, timestamp: meta.timestamp, txs: counts.get(n) ?? 0 });
+    }
+    return rows;
+  };
+
+  const snapshot = async () => {
+    // The book query is a dry-run execution on the validator; during a blast it would compete with
+    // the transactions being measured, so the last known book is shown instead.
+    if (!blastState.running) {
+      try {
+        lastPreconf = await engine.preconfBook();
+        preconfError = null;
+      } catch (err) {
+        preconfError = String(err);
+      }
+    }
+    const now = Date.now();
+    const records = engine.allRecords().sort((a, b) => a.submittedAt - b.submittedAt).slice(-RECENT_MAX);
+    const injected = records.filter((r) => r.path === 'injected' && !r.error && r.tPreconf !== undefined);
+    const preconfLatencies = injected.map((r) => r.tPreconf! - r.tSubmit);
+    const preconfLat = summarize(preconfLatencies);
+    const edges = [0, 5, 10, 20, 50, 100, 200, 500, Infinity];
+    const histogram = edges.slice(0, -1).map((lo, i) => ({ lo, hi: edges[i + 1], count: preconfLatencies.filter((x) => x >= lo && x < edges[i + 1]).length }));
+    const e2e = summarize(records.filter((r) => !r.error && r.tCommitted !== undefined).map((r) => r.tCommitted! - r.tSubmit));
+    const series = throughputSeries(records, now);
+    const lastSecond = series[series.length - 2]; // the last complete second
+    return JSON.stringify(
+      {
+        type: 'snapshot',
+        now,
+        mirror: chain.mirrorAddress,
+        sender: chain.sender.address,
+        node: nodeSettings(),
+        ethHead: await chain.publicClient.getBlockNumber(),
+        preconf: lastPreconf,
+        preconfError,
+        committed: engine.committedBook(),
+        watcher: engine.watcher.state(),
+        totals: {
+          txs: allTime.txs + engine.records.length,
+          preconfirmed: allTime.preconfirmed + engine.records.filter((r) => r.path === 'injected' && !r.error && r.tPreconf !== undefined).length,
+          committed: records.filter((r) => r.tCommitted !== undefined).length,
+          failed: allTime.failed + engine.records.filter((r) => r.error).length,
+          pending: records.filter((r) => !r.error && r.tCommitted === undefined).length,
+          allTimeMinMs: Number.isFinite(allTime.minMs) ? allTime.minMs : null,
+          allTimeMeanMs: allTime.preconfirmed ? allTime.sumMs / allTime.preconfirmed : null,
+        },
+        autopilot: { rate: autopilot.rate, running: autopilot.child !== null },
+        latency: { preconf: preconfLat, e2e, histogram },
+        throughput: { series, lastSecond: lastSecond.preconf, peak: Math.max(...series.map((b) => b.preconf)) },
+        blocks: await blockRows(),
+        records: records.slice(-40).map((r) => ({ ...r, wallPreconf: wallOf(r, r.tPreconf), wallCommitted: wallOf(r, r.tCommitted) })),
+        stats: { injected: statsFor(records, 'injected'), l1: statsFor(records, 'l1') },
+        blast: blastState,
+      },
+      bigintReplacer,
+    );
+  };
+
+  let broadcasting = false;
+  const broadcast = async () => {
+    if (wss.clients.size === 0 || broadcasting) return;
+    broadcasting = true;
+    try {
+      const msg = await snapshot();
+      for (const c of wss.clients) if (c.readyState === c.OPEN) safeSend(c, msg);
+    } finally {
+      broadcasting = false;
+    }
+  };
+  const tick = () => {
+    void broadcast().catch((e) => console.error('broadcast', e));
+    setTimeout(tick, blastState.running ? 1000 : 250);
+  };
+  tick();
+
+  wss.on('connection', (ws: WebSocket) => {
+    void snapshot()
+      .then((m) => safeSend(ws, m))
+      .catch((err) => safeSend(ws, JSON.stringify({ type: 'error', message: String(err) })));
+    ws.on('message', (raw) => {
+      let cmd: Command;
+      try {
+        cmd = JSON.parse(String(raw)) as Command;
+      } catch {
+        return;
+      }
+      void handle(cmd)
+        .then((reply) => reply && safeSend(ws, JSON.stringify(reply)))
+        .catch((err) => safeSend(ws, JSON.stringify({ type: 'error', message: String(err) })));
+    });
+  });
+
+  async function handle(cmd: Command): Promise<object | void> {
+    if (cmd.type === 'place') {
+      const [price, qty] = [BigInt(cmd.price), BigInt(cmd.qty)];
+      if (cmd.path === 'injected') await engine.placeInjected(cmd.side, price, qty);
+      else await engine.placeL1(cmd.side, price, qty);
+    } else if (cmd.type === 'reorg') {
+      const depth = Number(cmd.depth);
+      if (!Number.isInteger(depth) || depth < 1 || depth > 50) throw new Error('reorg depth must be an integer between 1 and 50');
+      await anvilReorg(chain.publicClient, depth);
+    } else if (cmd.type === 'autopilot') {
+      const rate = Math.min(300, Math.max(0, Number(cmd.rate) || 0));
+      setAutopilot(rate);
+    } else if (cmd.type === 'prepare') {
+      const p = await engine.prepareInjected(Number(cmd.side), BigInt(cmd.price), BigInt(cmd.qty));
+      const prepId = String(++prepSeq);
+      prepared.set(prepId, { p, at: Date.now() });
+      for (const [k, v] of prepared) if (Date.now() - v.at > 120_000) prepared.delete(k);
+      return { type: 'prepared', prepId, hash: p.tx.hash, messageId: p.tx.messageId };
+    } else if (cmd.type === 'submitSigned') {
+      const entry = prepared.get(cmd.prepId);
+      if (!entry) throw new Error('unknown or expired prepId');
+      prepared.delete(cmd.prepId);
+      const signature = cmd.signature as Hex;
+      const address = cmd.address.toLowerCase() as Hex;
+      await entry.p.tx.sign({
+        signMessage: async () => signature,
+        getAddress: async () => address,
+        signTypedData: async () => {
+          throw new Error('not supported');
+        },
+      });
+      const rec = await engine.sendPrepared(entry.p, 'passkey', address);
+      return { type: 'submitted', prepId: cmd.prepId, orderId: rec.orderId?.toString() ?? null, preconfMs: rec.tPreconf !== undefined ? rec.tPreconf - rec.tSubmit : null, error: rec.error ?? null };
+    } else if (cmd.type === 'blast') {
+      if (blastState.running) throw new Error('a blast is already running');
+      const total = Math.min(5000, Math.max(1, Number(cmd.total) || 0));
+      const concurrency = Math.min(256, Math.max(1, Number(cmd.concurrency) || 0));
+      blastState = { running: true, last: blastState.last };
+      const t0 = performance.now();
+      try {
+        const summary = await runBlast(total, concurrency, BLAST_SENDERS, ingest);
+        blastState = { running: false, last: summary };
+      } catch (err) {
+        blastState = { running: false, last: blastState.last };
+        throw err;
+      } finally {
+        console.log(`blast ${total}@${concurrency} took ${(performance.now() - t0).toFixed(0)} ms`);
+      }
+    }
+  }
+}
+
+/** Run blast-cli.ts as a child process and stream its records back. */
+function runBlast(total: number, concurrency: number, senders: number, onRecord: (r: WriteRecord) => void): Promise<Omit<BlastResult, 'records'>> {
+  const cli = resolve(dirname(fileURLToPath(import.meta.url)), 'blast-cli.ts');
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(process.execPath, [tsxBin(), cli, String(total), String(concurrency), String(senders), '--json'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let summary: Omit<BlastResult, 'records'> | null = null;
+    let stderr = '';
+    child.stderr.on('data', (d) => (stderr += String(d)));
+    createInterface({ input: child.stdout }).on('line', (line) => {
+      try {
+        const msg = JSON.parse(line) as { record?: Record<string, unknown>; summary?: Omit<BlastResult, 'records'> };
+        if (msg.record) onRecord(reviveRecord(msg.record));
+        if (msg.summary) summary = msg.summary;
+      } catch {
+        /* not JSON */
+      }
+    });
+    child.on('exit', (code) => (code === 0 && summary ? resolvePromise(summary) : reject(new Error(`blast child exited ${code}: ${stderr.slice(-300)}`))));
+  });
+}
+
+function tsxBin(): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), '..', 'node_modules', '.bin', 'tsx');
+}
+
+/** JSON lost the bigints (serialized as strings); restore the fields the engine compares by. */
+function reviveRecord(raw: Record<string, unknown>): WriteRecord {
+  const big = (k: string) => (typeof raw[k] === 'string' ? BigInt(raw[k] as string) : undefined);
+  return { ...(raw as unknown as WriteRecord), orderId: big('orderId'), ethBlock: big('ethBlock'), committedBlock: undefined, tCommitted: undefined };
+}
+
+function safeSend(ws: WebSocket, msg: string): void {
+  try {
+    if (ws.readyState === ws.OPEN) ws.send(msg);
+  } catch (err) {
+    console.error('ws send failed', err);
+  }
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

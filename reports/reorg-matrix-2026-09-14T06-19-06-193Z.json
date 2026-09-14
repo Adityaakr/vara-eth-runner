@@ -1,0 +1,260 @@
+[
+  {
+    "quarantine": 0,
+    "depth": 1,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "0",
+    "minCommittedSeqAfterReorg": "0",
+    "reorgDetectedMs": 94.96979199999987,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": 1829.6907919999976
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": 1829.6907919999976
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "block": "46",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "2",
+        "block": "46",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "3",
+        "block": "46",
+        "stillCommittedAtEnd": true
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 29ms",
+      "committedAfterMs": 7845.079834
+    },
+    "recoveredMs": 7958.762875,
+    "refusedCommitmentsLogLines": 0,
+    "notes": []
+  },
+  {
+    "quarantine": 0,
+    "depth": 3,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "0",
+    "minCommittedSeqAfterReorg": "0",
+    "reorgDetectedMs": 107.80554200000188,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": null
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": null
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "block": "46",
+        "stillCommittedAtEnd": false
+      },
+      {
+        "orderId": "2",
+        "block": "46",
+        "stillCommittedAtEnd": false
+      },
+      {
+        "orderId": "3",
+        "block": "46",
+        "stillCommittedAtEnd": false
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 6ms",
+      "committedAfterMs": null
+    },
+    "recoveredMs": null,
+    "refusedCommitmentsLogLines": 47,
+    "notes": []
+  },
+  {
+    "quarantine": 0,
+    "depth": 6,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "0",
+    "minCommittedSeqAfterReorg": "0",
+    "reorgDetectedMs": 81.64237499999581,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": null
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": null
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "block": "46",
+        "stillCommittedAtEnd": false
+      },
+      {
+        "orderId": "2",
+        "block": "46",
+        "stillCommittedAtEnd": false
+      },
+      {
+        "orderId": "3",
+        "block": "46",
+        "stillCommittedAtEnd": false
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 6ms",
+      "committedAfterMs": null
+    },
+    "recoveredMs": null,
+    "refusedCommitmentsLogLines": 47,
+    "notes": []
+  },
+  {
+    "quarantine": 4,
+    "depth": 1,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "5",
+    "minCommittedSeqAfterReorg": "5",
+    "reorgDetectedMs": 84.8929159999825,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": 925.4701249999925
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": 925.4701249999925
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "block": "50",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "2",
+        "block": "50",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "3",
+        "block": "50",
+        "stillCommittedAtEnd": true
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 2ms",
+      "committedAfterMs": 7942.134250000003
+    },
+    "recoveredMs": 8183.704415999993,
+    "refusedCommitmentsLogLines": 0,
+    "notes": []
+  },
+  {
+    "quarantine": 4,
+    "depth": 3,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "5",
+    "minCommittedSeqAfterReorg": "5",
+    "reorgDetectedMs": 81.82595800000126,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": 934.4231250000012
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": 934.4231250000012
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "block": "50",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "2",
+        "block": "50",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "3",
+        "block": "50",
+        "stillCommittedAtEnd": true
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 8ms",
+      "committedAfterMs": 7853.278707999998
+    },
+    "recoveredMs": 6141.972165999992,
+    "refusedCommitmentsLogLines": 0,
+    "notes": []
+  },
+  {
+    "quarantine": 4,
+    "depth": 6,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "0",
+    "minCommittedSeqAfterReorg": "0",
+    "reorgDetectedMs": 89.2937910000037,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": null
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": null
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "block": "50",
+        "stillCommittedAtEnd": false
+      },
+      {
+        "orderId": "2",
+        "block": "50",
+        "stillCommittedAtEnd": false
+      },
+      {
+        "orderId": "3",
+        "block": "50",
+        "stillCommittedAtEnd": false
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 7ms",
+      "committedAfterMs": null
+    },
+    "recoveredMs": null,
+    "refusedCommitmentsLogLines": 47,
+    "notes": []
+  }
+]

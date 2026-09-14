@@ -1,0 +1,17 @@
+# gear checkout (build it: see README "Build the node")
+gear/
+# build outputs
+orderbook/target/
+lab-server/dist/
+lab-ui/dist/
+node_modules/
+# generated at runtime
+run/*.log
+run/*.addr
+run/mirrors.txt
+run/node.json
+reports/*.log
+*.tsbuildinfo
+.DS_Store
+lab-ui/scripts/.render-check.*
+*.log

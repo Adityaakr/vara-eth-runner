@@ -1,0 +1,277 @@
+[
+  {
+    "quarantine": 0,
+    "depth": 1,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "5",
+    "minCommittedSeqAfterReorg": "0",
+    "reorgDetectedMs": 47.26366699999926,
+    "headAtReorg": "46",
+    "seededCommitBlock": "46",
+    "seededCommitInsideWindow": true,
+    "inFlightUncommittedAtReorg": true,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": 911.7055
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": 911.7055
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "block": "47",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "2",
+        "block": "47",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "3",
+        "block": "47",
+        "stillCommittedAtEnd": true
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 5ms",
+      "committedAfterMs": 7933.469125
+    },
+    "recoveredMs": 7980.042874999999,
+    "refusedCommitmentsLogLines": 0,
+    "notes": []
+  },
+  {
+    "quarantine": 0,
+    "depth": 3,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "0",
+    "minCommittedSeqAfterReorg": "0",
+    "reorgDetectedMs": null,
+    "headAtReorg": "46",
+    "seededCommitBlock": "46",
+    "seededCommitInsideWindow": true,
+    "inFlightUncommittedAtReorg": true,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": null
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": null
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "stillCommittedAtEnd": false
+      },
+      {
+        "orderId": "2",
+        "stillCommittedAtEnd": false
+      },
+      {
+        "orderId": "3",
+        "stillCommittedAtEnd": false
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 10ms",
+      "committedAfterMs": null
+    },
+    "recoveredMs": null,
+    "refusedCommitmentsLogLines": 52,
+    "notes": [
+      "watcher never detected the reorg"
+    ]
+  },
+  {
+    "quarantine": 0,
+    "depth": 6,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "0",
+    "minCommittedSeqAfterReorg": "0",
+    "reorgDetectedMs": 32.16758400000981,
+    "headAtReorg": "46",
+    "seededCommitBlock": "46",
+    "seededCommitInsideWindow": true,
+    "inFlightUncommittedAtReorg": true,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": null
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": null
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "stillCommittedAtEnd": false
+      },
+      {
+        "orderId": "2",
+        "stillCommittedAtEnd": false
+      },
+      {
+        "orderId": "3",
+        "stillCommittedAtEnd": false
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 6ms",
+      "committedAfterMs": null
+    },
+    "recoveredMs": null,
+    "refusedCommitmentsLogLines": 47,
+    "notes": []
+  },
+  {
+    "quarantine": 4,
+    "depth": 1,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "5",
+    "minCommittedSeqAfterReorg": "0",
+    "reorgDetectedMs": 25.409416999988025,
+    "headAtReorg": "50",
+    "seededCommitBlock": "50",
+    "seededCommitInsideWindow": true,
+    "inFlightUncommittedAtReorg": true,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": 931.0994999999821
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": 931.0994999999821
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "block": "51",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "2",
+        "block": "51",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "3",
+        "block": "51",
+        "stillCommittedAtEnd": true
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 8ms",
+      "committedAfterMs": 7900.874959000008
+    },
+    "recoveredMs": 7985.010584000003,
+    "refusedCommitmentsLogLines": 0,
+    "notes": []
+  },
+  {
+    "quarantine": 4,
+    "depth": 3,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "5",
+    "minCommittedSeqAfterReorg": "0",
+    "reorgDetectedMs": 42.901791000011144,
+    "headAtReorg": "50",
+    "seededCommitBlock": "50",
+    "seededCommitInsideWindow": true,
+    "inFlightUncommittedAtReorg": true,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": 897.5356250000186
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": 897.5356250000186
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "block": "51",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "2",
+        "block": "51",
+        "stillCommittedAtEnd": true
+      },
+      {
+        "orderId": "3",
+        "block": "51",
+        "stillCommittedAtEnd": true
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 7ms",
+      "committedAfterMs": 7901.270665999997
+    },
+    "recoveredMs": 8002.07695800002,
+    "refusedCommitmentsLogLines": 0,
+    "notes": []
+  },
+  {
+    "quarantine": 4,
+    "depth": 6,
+    "committedSeqBeforeReorg": "3",
+    "preconfSeqBeforeReorg": "5",
+    "committedSeqAfterRebuild": "0",
+    "minCommittedSeqAfterReorg": "0",
+    "reorgDetectedMs": 58.31691600001068,
+    "headAtReorg": "50",
+    "seededCommitBlock": "50",
+    "seededCommitInsideWindow": true,
+    "inFlightUncommittedAtReorg": true,
+    "inFlight": [
+      {
+        "orderId": "4",
+        "committedAfterMs": null
+      },
+      {
+        "orderId": "5",
+        "committedAfterMs": null
+      }
+    ],
+    "seeded": [
+      {
+        "orderId": "1",
+        "stillCommittedAtEnd": false
+      },
+      {
+        "orderId": "2",
+        "stillCommittedAtEnd": false
+      },
+      {
+        "orderId": "3",
+        "stillCommittedAtEnd": false
+      }
+    ],
+    "postReorgWrite": {
+      "outcome": "promise in 5ms",
+      "committedAfterMs": null
+    },
+    "recoveredMs": null,
+    "refusedCommitmentsLogLines": 47,
+    "notes": []
+  }
+]

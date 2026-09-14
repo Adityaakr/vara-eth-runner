@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1140 580" width="1140" height="580" font-family="Virgil, 'Segoe Print', 'Comic Sans MS', 'Chalkboard SE', cursive" font-size="15">
+  <style>
+    .box{fill:none;stroke:#1e1e1e;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+    .f1{fill:#e9f6f1}.f2{fill:#e0ecff}.f3{fill:#f6e6e6}.f4{fill:#fff7e0}
+    .ar{fill:none;stroke:#1e1e1e;stroke-width:2;stroke-linecap:round;marker-end:url(#h)}
+    .dash{stroke-dasharray:7 5}
+    .lbl{fill:#1e1e1e}.sm{font-size:12.5px;fill:#444}.t{font-size:20px;fill:#1e1e1e}.red{fill:#8a1c1c;font-size:13.5px}
+  </style>
+  <defs><marker id="h" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M1,1 L11,6 L1,11" fill="none" stroke="#1e1e1e" stroke-width="2" stroke-linecap="round"/></marker></defs>
+  <rect width="1140" height="580" fill="#ffffff"/>
+  <text x="40" y="38" class="t">Vara.eth pre-confirmation lab — how a transaction becomes a number on the page</text>
+
+  <path class="box f1" d="M42,92 q-3,3 -1,8 v96 q1,5 6,5 h210 q6,-1 6,-6 v-97 q-1,-6 -7,-6 h-208 q-4,0 -6,0 z"/>
+  <text x="150" y="122" text-anchor="middle" class="lbl">Browser (lab-ui)</text>
+  <text x="150" y="146" text-anchor="middle" class="sm">Vite + React · passkey signer</text>
+  <text x="150" y="164" text-anchor="middle" class="sm">WebAuthn PRF → secp256k1</text>
+
+  <path class="box f1" d="M402,91 q-4,2 -3,9 v95 q1,6 7,6 h250 q6,-2 5,-8 v-96 q0,-6 -6,-6 h-249 q-3,0 -4,0 z"/>
+  <text x="530" y="122" text-anchor="middle" class="lbl">lab-server (Node)</text>
+  <text x="530" y="146" text-anchor="middle" class="sm">WS :8787 · timing engine · L1 watcher</text>
+  <text x="530" y="164" text-anchor="middle" class="sm">autopilot · reorg-safe committed view</text>
+
+  <path class="box f4" d="M402,252 q-3,4 -2,9 v73 q1,6 7,6 h250 q6,-1 5,-7 v-76 q0,-5 -6,-5 h-250 q-3,0 -4,0 z"/>
+  <text x="530" y="282" text-anchor="middle" class="lbl">traffic-cli / blast-cli</text>
+  <text x="530" y="303" text-anchor="middle" class="sm">child processes · 4 accounts</text>
+  <text x="530" y="319" text-anchor="middle" class="sm">25 tx/s steady + surges</text>
+
+  <path class="box f2" d="M802,62 q-4,3 -2,9 v133 q0,6 7,6 h290 q6,-2 5,-8 v-134 q0,-6 -7,-6 h-289 q-3,0 -4,0 z"/>
+  <text x="950" y="96" text-anchor="middle" class="lbl">ethexe validator (gear v2.0.0)</text>
+  <text x="950" y="120" text-anchor="middle" class="sm">Malachite BFT · RPC :9944</text>
+  <text x="950" y="138" text-anchor="middle" class="sm">executes WASM · signs promises (~ms)</text>
+  <text x="950" y="156" text-anchor="middle" class="sm">anchors quarantine+1 blocks behind head</text>
+
+  <path class="box" style="fill:#fff" d="M832,232 q-3,3 -2,8 v72 q1,6 7,6 h230 q6,-2 5,-8 v-73 q0,-5 -6,-5 h-230 q-3,0 -4,0 z"/>
+  <text x="950" y="262" text-anchor="middle" class="lbl">orderbook program</text>
+  <text x="950" y="284" text-anchor="middle" class="sm">Sails 2.0 ethexe · Rust/WASM · 4 Mirror instances</text>
+  <text x="950" y="302" text-anchor="middle" class="sm">events: Placed · Filled · Cancelled (seq)</text>
+
+  <path class="box f3" d="M802,382 q-4,3 -2,9 v93 q0,6 7,6 h290 q6,-2 5,-8 v-94 q0,-6 -7,-6 h-289 q-3,0 -4,0 z"/>
+  <text x="950" y="414" text-anchor="middle" class="lbl">Anvil (Ethereum, 1 s blocks)</text>
+  <text x="950" y="438" text-anchor="middle" class="sm">Router · Mirror contracts · batch commitments</text>
+  <text x="950" y="456" text-anchor="middle" class="sm">program events as logs = the committed view</text>
+
+  <path class="ar" d="M262,128 C300,126 360,130 398,130"/><text x="330" y="112" text-anchor="middle" class="sm">prepare · submitSigned</text>
+  <path class="ar dash" d="M398,172 C360,174 300,172 262,172"/><text x="330" y="192" text-anchor="middle" class="sm">snapshots 4×/s</text>
+  <path class="ar" d="M530,203 C528,220 530,235 530,249"/><text x="620" y="232" text-anchor="middle" class="sm">spawn · JSON records</text>
+  <path class="ar" d="M662,126 C700,122 760,126 798,128"/><text x="730" y="114" text-anchor="middle" class="sm">injected tx (signed, no gas)</text>
+  <path class="ar dash" d="M798,170 C760,172 700,170 662,168"/><text x="730" y="190" text-anchor="middle" class="sm">signed promise ≈ ms</text>
+  <path class="ar" d="M662,290 C720,285 770,240 798,205"/><text x="712" y="268" text-anchor="middle" class="sm">load</text>
+  <path class="ar" d="M950,212 C951,218 950,224 950,230"/><text x="985" y="226" class="sm">execute</text>
+  <path class="ar" d="M950,320 C951,340 950,362 950,380"/><text x="1035" y="352" text-anchor="middle" class="sm">commit batch (1–3 blocks)</text>
+  <path class="ar dash" d="M798,440 C700,420 620,300 600,204"/><text x="690" y="372" text-anchor="middle" class="sm">getLogs → committed view</text>
+  <path class="ar dash" d="M662,100 C720,84 760,80 798,80"/><text x="730" y="70" text-anchor="middle" class="sm">calculateReplyForHandle → pre-confirmed view</text>
+
+  <text x="40" y="400" class="lbl">Two views of one program state:</text>
+  <text x="40" y="424" class="sm">• pre-confirmed = the validator's signed answer, milliseconds old</text>
+  <text x="40" y="444" class="sm">• committed = a replay of Ethereum logs only, nothing from the validator</text>
+  <text x="40" y="464" class="sm">The gap between them is what the page measures.</text>
+  <text x="40" y="530" class="red">Reorg tool: anvil_reorg(depth). Absorbed iff depth ≤ canonical-quarantine + 1;</text>
+  <text x="40" y="550" class="red">deeper → the validator keeps pre-confirming but never settles again.</text>
+</svg>

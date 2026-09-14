@@ -1,0 +1,45 @@
+[package]
+name = "orderbook"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Package allowing to build WASM binary for the program and IDL file for it"
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+orderbook-app.workspace = true
+sails-rs = { workspace = true, features = ["ethexe"] }
+
+[dev-dependencies]
+orderbook-app.workspace = true
+orderbook-client.workspace = true
+sails-rs = { workspace = true, features = ["ethexe", "gtest"] }
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[build-dependencies]
+orderbook-app.workspace = true
+sails-rs = { workspace = true, features = ["ethexe", "build"] }
+
+[workspace]
+resolver = "3"
+members = ["app", "client"]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Gear Technologies"]
+edition = "2024"
+rust-version = "1.91"
+repository = "https://github.com/gear-tech/orderbook"
+license = "MIT"
+keywords = ["gear", "sails", "smart-contracts", "wasm", "no-std"]
+categories = ["cryptography::cryptocurrencies", "no-std", "wasm"]
+
+[workspace.dependencies]
+sails-rs = "2.0.0"
+tokio = "1.52.3"
+orderbook-app = { version = "0.1.0", path = "app" }
+orderbook-client = { version = "0.1.0", path = "client" }

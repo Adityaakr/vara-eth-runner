@@ -1,0 +1,31 @@
+{
+  "name": "preconf-lab-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "serve": "tsx src/serve.ts",
+    "bench": "tsx src/bench.ts",
+    "reorg-matrix": "tsx src/reorg.ts",
+    "blast": "tsx src/blast-cli.ts"
+  },
+  "dependencies": {
+    "@gear-js/api": "0.45.0",
+    "@polkadot/api": "^16.5.1",
+    "@polkadot/util": "^14.0.1",
+    "@vara-eth/api": "file:../vendor/vara-eth-api-0.6.0-rc.0.tgz",
+    "kzg-wasm": "1.0.0",
+    "sails-js": "1.0.0",
+    "viem": "npm:@vara-eth/viem@2.48.11",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.12",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
