@@ -1,6 +1,6 @@
 # vara-eth-runner
 
-A local Vara.eth lab that measures what a validator pre-confirmation is worth: how fast it arrives, how much throughput one validator sustains, how long until Ethereum settles it, and what happens to it when Ethereum reorganises.
+A local Vara.eth lab that measures what a validator pre-confirmation is worth: how fast it arrives, how much throughput validator sustains, how long until Ethereum settles it, and what happens to it when Ethereum reorganises.
 
 Everything runs on one machine: a gear v2.0.0 ethexe node with an embedded Anvil, Sails 2.0 programs, a Node measurement engine, and a live telemetry page with passkey signing.
 
